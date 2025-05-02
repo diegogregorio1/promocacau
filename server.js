@@ -14,7 +14,7 @@ const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
 
 async function getSheetsClient() {
   const auth = new google.auth.GoogleAuth({
-    keyFile: 'credentials.json',
+    keyFile: '/etc/secrets/credentials.json',
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
   const authClient = await auth.getClient();
@@ -27,7 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Rota Registrar ---
-app.post('/registrar', async (req, res) => {
+app.post('/api/registrar', async (req, res) => {
   const { cpf, email } = req.body;
   if (!cpf || !email) {
     return res.status(400).json({ message: 'CPF e Email são obrigatórios.' });
@@ -62,7 +62,7 @@ app.post('/registrar', async (req, res) => {
 });
 
 // --- Rota Pagamento ---
-app.post('/pagamento', async (req, res) => {
+app.post('/api/pagamento', async (req, res) => {
   const { frete, referencia } = req.body;
 
   let valor, descricao;
