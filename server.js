@@ -83,18 +83,34 @@ app.post('/api/pagamento', async (req, res) => {
   }
 
   try {
-    const abacateRes = await fetch("https://www.abacatepay.com/api/pix", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        valor,
-        descricao,
-        referencia: referencia || "frete_" + Date.now(),
-      }),
-    });
+    const abacateRes = await fetch("https://api.abacatepay.com/v1/billing/create", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
+    "accept": "application/json"
+  },
+  body: JSON.stringify({
+    frequency: "ONE_TIME",
+    methods: ["PIX"],
+    products: [
+      {
+        externalId: referencia || "frete_" + Date.now(),
+        name: descricao,
+        description: descricao,
+        quantity: 1,
+        price: Math.round(valor * 100) // converte para centavos
+      }
+    ],
+    returnUrl: "https://seusite.com/voltar", // coloque o endereço do seu site
+    completionUrl: "https://seusite.com/obrigado",
+    customer: {
+      name: "Cliente",
+      email: "cliente@email.com",
+      document: "12345678900"
+    }
+  }),
+});
 
     if (!abacateRes.ok) {
       const error = await abacateRes.text();
