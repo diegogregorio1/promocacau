@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Promoção Cacau Show</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <img src="https://logodownload.org/wp-content/uploads/2017/07/cacau-show-logo-16.png" 
+         alt="Cacau Show Logo" class="logo-cacau-show">
+  </header>
+
+  <nav class="linha-do-tempo">
+    <ul>
+      <li class="etapa atual" id="passoPesquisa">Pesquisa</li>
+      <li class="etapa" id="passoChocolate">Escolha do Brinde</li>
+      <li class="etapa" id="passoEndereco">Endereço</li>
+      <li class="etapa" id="passoDados">Dados</li>
+      <li class="etapa" id="passoFrete">Frete</li>
+      <li class="etapa" id="passoConfirmacao">Confirmação</li>
+    </ul>
+  </nav>
+
+  <main>
+    <!-- Etapa 1: Pesquisa -->
+    <section id="etapa-pesquisa" class="etapa-ativa">
+      <div class="card-padrao">
+        <h1>🎉 Ganhe Chocolate Grátis da Cacau Show!</h1>
+        <p>🍫 Responda nossa pesquisa rápida e receba um delicioso chocolate na sua casa!</p>
+        <form id="pesquisa-form">
+          <div class="question">
+            <label for="frequencia"><strong>1. Com que frequência você consome chocolate?</strong></label>
+            <select id="frequencia" name="frequencia" required>
+              <option value="" disabled selected>Selecione uma opção</option>
+              <option value="Diariamente">Diariamente</option>
+              <option value="Semanalmente">Semanalmente</option>
+              <option value="Mensalmente">Mensalmente</option>
+              <option value="Raramente">Raramente</option>
+            </select>
+          </div>
+          <div class="question">
+            <label for="tipo-chocolate"><strong>2. Qual seu tipo de chocolate preferido?</strong></label>
+            <select id="tipo-chocolate" name="tipo-chocolate" required>
+              <option value="" disabled selected>Selecione uma opção</option>
+              <option value="Ao Leite">Ao Leite</option>
+              <option value="Meio Amargo">Meio Amargo</option>
+              <option value="Branco">Branco</option>
+              <option value="Recheado">Recheado</option>
+            </select>
+          </div>
+          <div class="question">
+            <label for="quantidade-chocolate"><strong>3. Quantas vezes por semana você compra chocolates?</strong></label>
+            <select id="quantidade-chocolate" name="quantidade-chocolate" required>
+              <option value="" disabled selected>Selecione uma opção</option>
+              <option value="0-1 vezes">0-1 vezes</option>
+              <option value="2-3 vezes">2-3 vezes</option>
+              <option value="4 ou mais vezes">4 ou mais vezes</option>
+            </select>
+          </div>
+          <div class="question">
+            <label for="preferencia-marca"><strong>4. Qual marca de chocolates você consome com mais frequência?</strong></label>
+            <select id="preferencia-marca" name="preferencia-marca" required>
+              <option value="" disabled selected>Selecione uma opção</option>
+              <option value="Cacau Show">Cacau Show</option>
+              <option value="Lacta">Lacta</option>
+              <option value="Nestlé">Nestlé</option>
+              <option value="Garoto">Garoto</option>
+              <option value="Outras">Outras</option>
+            </select>
+          </div>
+          <button type="button" id="botaoProximo1" disabled>Avançar</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Etapa 2: Escolha do Chocolate -->
+    <section id="etapa-escolha" class="etapa-oculta">
+      <div class="card-padrao">
+        <h1>🍫 Escolha seu Chocolate Grátis!</h1>
+        <p>Selecione um dos produtos abaixo para continuar.</p>
+        <div id="produtos">
+          <div class="produto-card">
+            <img src="https://www.cacaushow.com.br/on/demandware.static/-/Sites-masterCatalog_CacauShow/default/dw3d64ae6a/large/1001797_1.png" alt="Ovo de Páscoa Clássicos ao Leite com Bombons 2kg">
+            <h2>Ovo de Páscoa Clássicos ao Leite com Bombons 2kg</h2>
+            <p class="preco"><span class="antigo">R$ 399,99</span> <span class="gratis">R$ 0,00</span></p>
+            <button class="botao-selecionar">Selecionar</button>
+          </div>
+          <div class="produto-card">
+            <img src="https://www.cacaushow.com.br/on/demandware.static/-/Sites-masterCatalog_CacauShow/default/dwe40064b2/large/1003499_5.png" alt="Ovo de Páscoa do Chef Pistache 600g">
+            <h2>Ovo de Páscoa do Chef Pistache 600g</h2>
+            <p class="preco"><span class="antigo">R$ 199,99</span> <span class="gratis">R$ 0,00</span></p>
+            <button class="botao-selecionar">Selecionar</button>
+          </div>
+          <div class="produto-card">
+            <img src="https://www.cacaushow.com.br/on/demandware.static/-/Sites-masterCatalog_CacauShow/default/dwf6f99fae/large/1003498_1.png" alt="Ovo de Páscoa do Chef Nuts Recheado 600g">
+            <h2>Ovo de Páscoa do Chef Nuts Recheado 600g</h2>
+            <p class="preco"><span class="antigo">R$ 174,99</span> <span class="gratis">R$ 0,00</span></p>
+            <button class="botao-selecionar">Selecionar</button>
+          </div>
+          <div class="produto-card">
+            <img src="https://www.cacaushow.com.br/on/demandware.static/-/Sites-masterCatalog_CacauShow/default/dw795e26c0/large/1003539_5.png" alt="Ovo de Páscoa ao Leite Pantufa Ursinhos Carinhosos Ursinha Carinhosa G 170g">
+            <h2>Ovo de Páscoa ao Leite Pantufa Ursinhos Carinhosos Ursinha Carinhosa G 170g</h2>
+            <p class="preco"><span class="antigo">R$ 118,89</span> <span class="gratis">R$ 0,00</span></p>
+            <button class="botao-selecionar">Selecionar</button>
+          </div>
+        </div>
+        <button type="button" id="botaoVoltar1">Voltar</button>
+      </div>
+    </section>
+
+    <!-- Etapa 3: Endereço -->
+    <section id="etapa-endereco" class="etapa-oculta">
+      <div class="card-padrao">
+        <h1>📦 Informe seu Endereço</h1>
+        <p>Digite o CEP para entrega do seu chocolate:</p>
+        <form id="endereco-form" autocomplete="off">
+          <div class="question">
+            <label for="cep"><strong>CEP</strong></label>
+            <input type="text" id="cep" name="cep" maxlength="9" autocomplete="off" required placeholder="Digite o CEP">
+          </div>
+          <div id="endereco-fields" style="display:none;">
+            <div class="question">
+              <label><strong>Rua</strong></label>
+              <input type="text" id="rua" name="rua" readonly>
+            </div>
+            <div class="question">
+              <label><strong>Bairro</strong></label>
+              <input type="text" id="bairro" name="bairro" readonly>
+            </div>
+            <div class="question">
+              <label><strong>Cidade</strong></label>
+              <input type="text" id="cidade" name="cidade" readonly>
+            </div>
+            <div class="question">
+              <label><strong>UF</strong></label>
+              <input type="text" id="uf" name="uf" readonly>
+            </div>
+            <button type="button" id="botaoAvancarEndereco" style="display:none;">Avançar</button>
+          </div>
+        </form>
+        <button type="button" id="botaoVoltar2">Voltar</button>
+      </div>
+    </section>
+
+    <!-- Etapa 4: Dados Pessoais -->
+    <section id="etapa-dados" class="etapa-oculta">
+      <div class="card-padrao">
+        <h1>👤 Dados Pessoais</h1>
+        <form id="dados-form" autocomplete="off">
+          <div class="question">
+            <label for="nome"><strong>Nome Completo</strong></label>
+            <input type="text" id="nome" name="nome" required autocomplete="off" />
+          </div>
+          <div class="question">
+            <label for="cpf"><strong>CPF</strong></label>
+            <input type="text" id="cpf" name="cpf" maxlength="14" required autocomplete="off" placeholder="000.000.000-00" />
+          </div>
+          <div class="question">
+            <label for="email"><strong>Email</strong></label>
+            <input type="email" id="email" name="email" required autocomplete="off" />
+          </div>
+          <div class="question">
+            <label for="numero"><strong>Número da Residência</strong></label>
+            <input type="text" id="numero" name="numero" required autocomplete="off" />
+          </div>
+          <div class="question">
+            <label for="complemento"><strong>Complemento <span style="font-weight:normal;">(opcional)</span></strong></label>
+            <input type="text" id="complemento" name="complemento" autocomplete="off" />
+          </div>
+          <button type="button" id="botaoAvancarDados" disabled>Avançar</button>
+        </form>
+        <button type="button" id="botaoVoltar3">Voltar</button>
+      </div>
+    </section>
+
+    <!-- Etapa 5: Tipo de Frete -->
+    <section id="etapa-frete" class="etapa-oculta">
+      <div class="card-padrao">
+        <h1>🚚 Tipo de Frete</h1>
+        <form id="frete-form">
+          <div class="frete-opcao">
+            <input type="radio" id="pac" name="tipo-frete" value="PAC" data-preco="17.99" required>
+            <label for="pac"><strong>PAC</strong> — R$ 17,99<br><small>(Entrega em 4 a 7 dias úteis)</small></label>
+          </div>
+          <div class="frete-opcao">
+            <input type="radio" id="sedex" name="tipo-frete" value="SEDEX" data-preco="29.99" required>
+            <label for="sedex"><strong>SEDEX</strong> — R$ 29,99<br><small>(Entrega em 2 a 3 dias úteis)</small></label>
+          </div>
+          <button type="button" id="botaoAvancarFrete" disabled>Avançar</button>
+        </form>
+        <button type="button" id="botaoVoltarFrete">Voltar</button>
+      </div>
+    </section>
+
+    <!-- Etapa 6: Confirmação -->
+    <section id="etapa-confirmacao" class="etapa-oculta">
+      <div class="card-padrao">
+        <h1>✅ Confirmação do Pedido</h1>
+        <div id="resumoPedido" class="resumo-pedido"></div>
+        <div class="pagamento-area">
+          <h2>Forma de pagamento</h2>
+          <div class="pagamento-pix">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/0/04/Logo_pix_vertical_branco.svg" alt="PIX" />
+            <span>Só aceitamos pagamento via <strong>PIX</strong></span>
+          </div>
+          <button type="button" id="botaoPagarPix">Pagar com PIX</button>
+        </div>
+        <button type="button" id="botaoVoltarConfirmacao">Voltar</button>
+      </div>
+    </section>
+
+    <!-- Etapa 7: Sucesso -->
+    <section id="etapa-sucesso" class="etapa-oculta">
+      <div class="card-padrao">
+        <h1 style="color:#43a047;">🎉 Pedido realizado com sucesso!</h1>
+        <p>Obrigado por participar da promoção Cacau Show.</p>
+        <p>Aguarde um e-mail com o código de rastreio do seu pedido.</p>
+        <img src="https://cdn-icons-png.flaticon.com/512/190/190411.png" alt="Sucesso" style="width:70px;margin-top:15px;">
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      © 2025 Cacau Show - Todos os direitos reservados. |
+      <a href="termos-de-uso.html">Termos de Uso</a> |
+      <a href="politica-de-privacidade.html">Política de Privacidade</a>
+    </p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
