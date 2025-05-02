@@ -1,0 +1,123 @@
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const { google } = require('googleapis');
+const fetch = require('node-fetch'); // Instale com `npm install node-fetch` se ainda não tiver
+require('dotenv').config(); // Garanta que o .env está correto
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// --- Config Sheets ---
+const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
+// O arquivo credentials.json deve estar na raiz do projeto (NÃO subir no GitHub!)
+
+async function getSheetsClient() {
+  const auth = new google.auth.GoogleAuth({
+    keyFile: 'credentials.json',
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+  const authClient = await auth.getClient();
+  return google.sheets({ version: 'v4', auth: authClient });
+}
+
+// --- Middlewares ---
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Rota Registrar ---
+app.post('/registrar', async (req, res) => {
+  const { cpf, email } = req.body;
+  if (!cpf || !email) {
+    return res.status(400).json({ message: 'CPF e Email são obrigatórios.' });
+  }
+
+  try {
+    const sheets = await getSheetsClient();
+    const readRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'A:B',
+    });
+
+    const rows = readRes.data.values || [];
+    const cpfExists = rows.some(row => row[0] === cpf);
+
+    if (cpfExists) {
+      return res.status(400).json({ message: 'CPF já cadastrou e ganhou o brinde.' });
+    }
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'A:B',
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [[cpf, email]] },
+    });
+
+    return res.status(200).json({ message: 'Cadastro realizado com sucesso! Brinde garantido.' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Erro ao acessar a planilha.' });
+  }
+});
+
+// --- Rota Pagamento ---
+app.post('/pagamento', async (req, res) => {
+  const { frete, referencia } = req.body;
+
+  let valor, descricao;
+  if (frete === "pac") {
+    valor = 17.99;
+    descricao = "Frete PAC";
+  } else if (frete === "sedex") {
+    valor = 29.99;
+    descricao = "Frete SEDEX";
+  } else {
+    console.error("Frete inválido:", frete);
+    return res.status(400).json({ error: "Frete inválido" });
+  }
+
+  const token = process.env.ABACATEPAY_TOKEN;
+  if (!token) {
+    return res.status(500).json({ error: "Token Abacatepay não configurado" });
+  }
+
+  try {
+    const abacateRes = await fetch("https://www.abacatepay.com/api/pix", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        valor,
+        descricao,
+        referencia: referencia || "frete_" + Date.now(),
+      }),
+    });
+
+    if (!abacateRes.ok) {
+      const error = await abacateRes.text();
+      console.error("Erro Abacatepay:", error);
+      return res.status(500).json({ error: "Erro Abacatepay: " + error });
+    }
+
+    const data = await abacateRes.json();
+
+    res.status(200).json({
+      qrcode: data.qrcode,
+      copiaecola: data.copiaecola,
+      id: data.id,
+      valor,
+      descricao,
+    });
+  } catch (e) {
+    console.error("Erro interno:", e);
+    res.status(500).json({ error: "Erro interno no servidor: " + e.message });
+  }
+});
+
+// --- Start Server ---
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
