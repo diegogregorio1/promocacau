@@ -129,7 +129,7 @@ main {
   margin-bottom: 6px;
   color: #5d3a00;
 }
-.card-padrao select, .card-padrao input[type="text"], .card-padrao input[type="email"] {
+.card-padrao select, .card-padrao input[type="text"], .card-padrao input[type="email"], .card-padrao input[type="tel"] {
   width: 100%;
   padding: 10px;
   border: 1.5px solid #c8a165;
