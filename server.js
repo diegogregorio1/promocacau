@@ -2,13 +2,15 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { google } = require('googleapis');
-const fetch = require('node-fetch');
-require('dotenv').config();
+const fetch = require('node-fetch'); // Instale com `npm install node-fetch` se ainda não tiver
+require('dotenv').config(); // Garanta que o .env está correto
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// --- Config Sheets ---
 const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
+// O arquivo credentials.json deve estar na raiz do projeto (NÃO subir no GitHub!)
 
 async function getSheetsClient() {
   const auth = new google.auth.GoogleAuth({
@@ -19,10 +21,12 @@ async function getSheetsClient() {
   return google.sheets({ version: 'v4', auth: authClient });
 }
 
+// --- Middlewares ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// --- Rota Registrar ---
 app.post('/api/registrar', async (req, res) => {
   const { nome, cpf, email, cellphone } = req.body;
   if (!nome || !cpf || !email || !cellphone) {
@@ -56,13 +60,16 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
+// --- Rota Pagamento ---
 app.post('/api/pagamento', async (req, res) => {
   const { frete, referencia, nome, email, cellphone, cpf } = req.body;
 
   // Garante que o CPF está limpo e válido (apenas números e 11 dígitos)
   const cpfLimpo = (cpf || '').replace(/\D/g, '');
-  if (!cpfLimpo || cpfLimpo.length !== 11) {
-    return res.status(400).json({ error: "CPF inválido para pagamento" });
+  console.log('DEBUG CPF para Abacatepay:', cpf, 'Limpo:', cpfLimpo);
+
+  if (!/^\d{11}$/.test(cpfLimpo)) {
+    return res.status(400).json({ error: "CPF inválido para pagamento (taxId)" });
   }
 
   let valor, descricao;
@@ -99,10 +106,10 @@ app.post('/api/pagamento', async (req, res) => {
             name: descricao,
             description: descricao,
             quantity: 1,
-            price: Math.round(valor * 100)
+            price: Math.round(valor * 100) // em centavos
           }
         ],
-        returnUrl: "https://seusite.com/voltar",
+        returnUrl: "https://seusite.com/voltar", // coloque o endereço do seu site
         completionUrl: "https://seusite.com/obrigado",
         customer: {
           name: nome,
@@ -134,6 +141,7 @@ app.post('/api/pagamento', async (req, res) => {
   }
 });
 
+// --- Start Server ---
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
