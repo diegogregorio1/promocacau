@@ -127,6 +127,7 @@ app.post('/api/pagamento', async (req, res) => {
     }
 
     const data = await abacateRes.json();
+    console.log("RESPOSTA ABACATEPAY:", data);
 
     res.status(200).json({
       qrcode: data.qrcode,
