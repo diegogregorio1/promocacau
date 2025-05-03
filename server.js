@@ -2,15 +2,13 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { google } = require('googleapis');
-const fetch = require('node-fetch'); // Instale com `npm install node-fetch` se ainda não tiver
-require('dotenv').config(); // Garanta que o .env está correto
+const fetch = require('node-fetch');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- Config Sheets ---
 const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
-// O arquivo credentials.json deve estar na raiz do projeto (NÃO subir no GitHub!)
 
 async function getSheetsClient() {
   const auth = new google.auth.GoogleAuth({
@@ -21,12 +19,10 @@ async function getSheetsClient() {
   return google.sheets({ version: 'v4', auth: authClient });
 }
 
-// --- Middlewares ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Rota Registrar ---
 app.post('/api/registrar', async (req, res) => {
   const { nome, cpf, email, cellphone } = req.body;
   if (!nome || !cpf || !email || !cellphone) {
@@ -60,10 +56,14 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
-// --- Rota Pagamento ---
 app.post('/api/pagamento', async (req, res) => {
-  // Corrigido: agora pega os dados do frontend corretamente
   const { frete, referencia, nome, email, cellphone, cpf } = req.body;
+
+  // Garante que o CPF está limpo e válido (apenas números e 11 dígitos)
+  const cpfLimpo = (cpf || '').replace(/\D/g, '');
+  if (!cpfLimpo || cpfLimpo.length !== 11) {
+    return res.status(400).json({ error: "CPF inválido para pagamento" });
+  }
 
   let valor, descricao;
   if (frete === "pac") {
@@ -99,16 +99,16 @@ app.post('/api/pagamento', async (req, res) => {
             name: descricao,
             description: descricao,
             quantity: 1,
-            price: Math.round(valor * 100) // em centavos
+            price: Math.round(valor * 100)
           }
         ],
-        returnUrl: "https://seusite.com/voltar", // coloque o endereço do seu site
+        returnUrl: "https://seusite.com/voltar",
         completionUrl: "https://seusite.com/obrigado",
         customer: {
           name: nome,
           email: email,
           cellphone: cellphone,
-          taxId: cpf
+          taxId: cpfLimpo
         }
       }),
     });
@@ -134,7 +134,6 @@ app.post('/api/pagamento', async (req, res) => {
   }
 });
 
-// --- Start Server ---
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
