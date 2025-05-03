@@ -29,29 +29,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 // --- Rota Registrar ---
 app.post('/api/registrar', async (req, res) => {
   const { nome, cpf, email, cellphone } = req.body;
-if (!nome || !cpf || !email || !cellphone) {
-  return res.status(400).json({ message: 'Nome, CPF, Email e Celular são obrigatórios.' });
-}
+  if (!nome || !cpf || !email || !cellphone) {
+    return res.status(400).json({ message: 'Nome, CPF, Email e Celular são obrigatórios.' });
+  }
 
   try {
     const sheets = await getSheetsClient();
     const readRes = await sheets.spreadsheets.values.get({
-  spreadsheetId: SPREADSHEET_ID,
-  range: 'A:D',
-});
-const rows = readRes.data.values || [];
-const cpfExists = rows.some(row => row[1] === cpf);
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'A:D',
+    });
+    const rows = readRes.data.values || [];
+    const cpfExists = rows.some(row => row[1] === cpf);
 
     if (cpfExists) {
       return res.status(400).json({ message: 'CPF já cadastrou e ganhou o brinde.' });
     }
 
-await sheets.spreadsheets.values.append({
-  spreadsheetId: SPREADSHEET_ID,
-  range: 'A:D',
-  valueInputOption: 'USER_ENTERED',
-  resource: { values: [[nome, cpf, email, cellphone]] },
-});
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'A:D',
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [[nome, cpf, email, cellphone]] },
+    });
 
     return res.status(200).json({ message: 'Cadastro realizado com sucesso! Brinde garantido.' });
   } catch (error) {
@@ -62,7 +62,8 @@ await sheets.spreadsheets.values.append({
 
 // --- Rota Pagamento ---
 app.post('/api/pagamento', async (req, res) => {
-  const { frete, referencia } = req.body;
+  // Corrigido: agora pega os dados do frontend corretamente
+  const { frete, referencia, nome, email, cellphone, cpf } = req.body;
 
   let valor, descricao;
   if (frete === "pac") {
@@ -83,34 +84,34 @@ app.post('/api/pagamento', async (req, res) => {
 
   try {
     const abacateRes = await fetch("https://api.abacatepay.com/v1/billing/create", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}`,
-    "accept": "application/json"
-  },
-  body: JSON.stringify({
-    frequency: "ONE_TIME",
-    methods: ["PIX"],
-    products: [
-      {
-        externalId: referencia || "frete_" + Date.now(),
-        name: descricao,
-        description: descricao,
-        quantity: 1,
-        price: Math.round(valor * 100) // converte para centavos
-      }
-    ],
-    returnUrl: "https://seusite.com/voltar", // coloque o endereço do seu site
-    completionUrl: "https://seusite.com/obrigado",
-    customer: {
-      name: "Cliente",
-      email: "cliente@email.com",
-      cellphone: "+5500000000000",
-      taxId: "12345678900"
-    }
-  }),
-});
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "accept": "application/json"
+      },
+      body: JSON.stringify({
+        frequency: "ONE_TIME",
+        methods: ["PIX"],
+        products: [
+          {
+            externalId: referencia || "frete_" + Date.now(),
+            name: descricao,
+            description: descricao,
+            quantity: 1,
+            price: Math.round(valor * 100) // em centavos
+          }
+        ],
+        returnUrl: "https://seusite.com/voltar", // coloque o endereço do seu site
+        completionUrl: "https://seusite.com/obrigado",
+        customer: {
+          name: nome,
+          email: email,
+          cellphone: cellphone,
+          taxId: cpf
+        }
+      }),
+    });
 
     if (!abacateRes.ok) {
       const error = await abacateRes.text();
