@@ -28,10 +28,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Rota Registrar ---
 app.post('/api/registrar', async (req, res) => {
-  const { cpf, email } = req.body;
-  if (!cpf || !email) {
-    return res.status(400).json({ message: 'CPF e Email são obrigatórios.' });
-  }
+  const { nome, cpf, email, cellphone } = req.body;
+if (!nome || !cpf || !email || !cellphone) {
+  return res.status(400).json({ message: 'Nome, CPF, Email e Celular são obrigatórios.' });
+}
 
   try {
     const sheets = await getSheetsClient();
