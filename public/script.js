@@ -192,8 +192,16 @@ document.addEventListener('DOMContentLoaded', () => {
     botaoAvancar.disabled = true;
     botaoAvancar.textContent = "Enviando...";
 
-    const cpf = cpfInput.value;
-    const email = emailInput.value;
+    // Pegando todos os campos obrigatórios
+    const nome = nomeInput.value.trim();
+    const cpf = cpfInput.value.replace(/\D/g, ''); // remove pontos e traços
+    const email = emailInput.value.trim();
+    let cellphone = numeroInput.value.replace(/\D/g, ''); // remove tudo que não for número
+
+    // Adiciona o +55 se o telefone tiver 11 dígitos e não começar com +55
+    if (cellphone.length === 11 && !cellphone.startsWith('+55')) {
+      cellphone = '+55' + cellphone;
+    }
 
     try {
       const resposta = await fetch('/api/registrar', {
@@ -201,16 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        const nome = nomeInput.value.trim();
-const cpf = cpfInput.value.replace(/\D/g, '');
-const email = emailInput.value.trim();
-let cellphone = numeroInput.value.replace(/\D/g, '');
-
-if (cellphone.length === 11 && !cellphone.startsWith('+55')) {
-  cellphone = '+55' + cellphone;
-}
-
-body: JSON.stringify({ nome, cpf, email, cellphone })
+        body: JSON.stringify({ nome, cpf, email, cellphone })
       });
 
       const resultado = await resposta.json();
@@ -336,62 +335,65 @@ body: JSON.stringify({ nome, cpf, email, cellphone })
   }
 
   // Sucesso não tem voltar!
-if (botaoPagarPix) {
-  botaoPagarPix.addEventListener('click', async () => {
-    // Descobre o frete selecionado (PAC ou SEDEX)
-    const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
-    let tipoFrete = freteSelecionado ? freteSelecionado.value.toLowerCase() : null; // 'pac' ou 'sedex'
-    if (!tipoFrete) {
-      alert('Selecione o tipo de frete para gerar o Pix.');
-      return;
-    }
-
-    botaoPagarPix.disabled = true;
-    botaoPagarPix.textContent = "Gerando Pix...";
-
-    try {
-      // Pegue os dados do formulário
-const nome = document.getElementById('nome').value;
-const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
-const email = document.getElementById('email').value;
-const cellphone = document.getElementById('numero').value;
-
-const resposta = await fetch('/api/pagamento', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    frete: tipoFrete,
-    nome,
-    cpf,
-    email,
-    cellphone
-  }),
-});
-      const data = await resposta.json();
-
-      if (data.qrcode) {
-        // Crie ou atualize um elemento para exibir o QR Code e copia-e-cola
-        let divPix = document.getElementById('pix-info');
-        if (!divPix) {
-          divPix = document.createElement('div');
-          divPix.id = 'pix-info';
-          botaoPagarPix.parentElement.appendChild(divPix);
-        }
-        divPix.innerHTML = `
-          <h3>Escaneie o QR Code com seu app bancário:</h3>
-          <img src="data:image/png;base64,${data.qrcode}" alt="Pix QR Code" style="max-width:300px;display:block;margin:0 auto 16px;" />
-          <p>Valor: R$ ${data.valor.toFixed(2)}</p>
-          <b>Copia e cola Pix:</b>
-          <textarea readonly style="width:100%;font-size:1.1em;">${data.copiaecola}</textarea>
-        `;
-      } else {
-        alert('Erro ao gerar Pix: ' + (data.error || 'Tente novamente'));
+  if (botaoPagarPix) {
+    botaoPagarPix.addEventListener('click', async () => {
+      // Descobre o frete selecionado (PAC ou SEDEX)
+      const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
+      let tipoFrete = freteSelecionado ? freteSelecionado.value.toLowerCase() : null; // 'pac' ou 'sedex'
+      if (!tipoFrete) {
+        alert('Selecione o tipo de frete para gerar o Pix.');
+        return;
       }
-    } catch (erro) {
-      alert('Erro ao gerar Pix. Tente novamente.');
-    }
-    botaoPagarPix.disabled = false;
-    botaoPagarPix.textContent = "Pagar com PIX";
-  });
-}
+
+      botaoPagarPix.disabled = true;
+      botaoPagarPix.textContent = "Gerando Pix...";
+
+      try {
+        // Pegue os dados do formulário
+        const nome = document.getElementById('nome').value;
+        const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
+        const email = document.getElementById('email').value;
+        let cellphone = document.getElementById('numero').value.replace(/\D/g, '');
+        if (cellphone.length === 11 && !cellphone.startsWith('+55')) {
+          cellphone = '+55' + cellphone;
+        }
+
+        const resposta = await fetch('/api/pagamento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            frete: tipoFrete,
+            nome,
+            cpf,
+            email,
+            cellphone
+          }),
+        });
+        const data = await resposta.json();
+
+        if (data.qrcode) {
+          // Crie ou atualize um elemento para exibir o QR Code e copia-e-cola
+          let divPix = document.getElementById('pix-info');
+          if (!divPix) {
+            divPix = document.createElement('div');
+            divPix.id = 'pix-info';
+            botaoPagarPix.parentElement.appendChild(divPix);
+          }
+          divPix.innerHTML = `
+            <h3>Escaneie o QR Code com seu app bancário:</h3>
+            <img src="data:image/png;base64,${data.qrcode}" alt="Pix QR Code" style="max-width:300px;display:block;margin:0 auto 16px;" />
+            <p>Valor: R$ ${data.valor.toFixed(2)}</p>
+            <b>Copia e cola Pix:</b>
+            <textarea readonly style="width:100%;font-size:1.1em;">${data.copiaecola}</textarea>
+          `;
+        } else {
+          alert('Erro ao gerar Pix: ' + (data.error || 'Tente novamente'));
+        }
+      } catch (erro) {
+        alert('Erro ao gerar Pix. Tente novamente.');
+      }
+      botaoPagarPix.disabled = false;
+      botaoPagarPix.textContent = "Pagar com PIX";
+    });
+  }
 });
