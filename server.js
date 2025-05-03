@@ -36,23 +36,22 @@ if (!nome || !cpf || !email || !cellphone) {
   try {
     const sheets = await getSheetsClient();
     const readRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'A:B',
-    });
-
-    const rows = readRes.data.values || [];
-    const cpfExists = rows.some(row => row[0] === cpf);
+  spreadsheetId: SPREADSHEET_ID,
+  range: 'A:D',
+});
+const rows = readRes.data.values || [];
+const cpfExists = rows.some(row => row[1] === cpf);
 
     if (cpfExists) {
       return res.status(400).json({ message: 'CPF já cadastrou e ganhou o brinde.' });
     }
 
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'A:B',
-      valueInputOption: 'USER_ENTERED',
-      resource: { values: [[cpf, email]] },
-    });
+await sheets.spreadsheets.values.append({
+  spreadsheetId: SPREADSHEET_ID,
+  range: 'A:D',
+  valueInputOption: 'USER_ENTERED',
+  resource: { values: [[nome, cpf, email, cellphone]] },
+});
 
     return res.status(200).json({ message: 'Cadastro realizado com sucesso! Brinde garantido.' });
   } catch (error) {
