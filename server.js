@@ -2,15 +2,30 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { google } = require('googleapis');
-const fetch = require('node-fetch'); // Instale com `npm install node-fetch` se ainda não tiver
-require('dotenv').config(); // Garanta que o .env está correto
+const fetch = require('node-fetch');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- Config Sheets ---
 const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
-// O arquivo credentials.json deve estar na raiz do projeto (NÃO subir no GitHub!)
+
+// Função para validar CPF (dígito verificador)
+function validarCPF(cpf) {
+  cpf = cpf.replace(/[^\d]+/g,'');
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  let soma = 0, resto;
+  for (let i=1; i<=9; i++) soma += parseInt(cpf.substring(i-1, i))*(11-i);
+  resto = (soma*10)%11;
+  if ((resto===10)||(resto===11)) resto = 0;
+  if (resto !== parseInt(cpf.substring(9, 10))) return false;
+  soma = 0;
+  for (let i=1; i<=10; i++) soma += parseInt(cpf.substring(i-1, i))*(12-i);
+  resto = (soma*10)%11;
+  if ((resto===10)||(resto===11)) resto = 0;
+  if (resto !== parseInt(cpf.substring(10, 11))) return false;
+  return true;
+}
 
 async function getSheetsClient() {
   const auth = new google.auth.GoogleAuth({
@@ -21,16 +36,18 @@ async function getSheetsClient() {
   return google.sheets({ version: 'v4', auth: authClient });
 }
 
-// --- Middlewares ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Rota Registrar ---
 app.post('/api/registrar', async (req, res) => {
   const { nome, cpf, email, cellphone } = req.body;
   if (!nome || !cpf || !email || !cellphone) {
     return res.status(400).json({ message: 'Nome, CPF, Email e Celular são obrigatórios.' });
+  }
+
+  if (!validarCPF(cpf)) {
+    return res.status(400).json({ message: 'CPF inválido.' });
   }
 
   try {
@@ -60,15 +77,13 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
-// --- Rota Pagamento ---
 app.post('/api/pagamento', async (req, res) => {
   const { frete, referencia, nome, email, cellphone, cpf } = req.body;
 
-  // Garante que o CPF está limpo e válido (apenas números e 11 dígitos)
   const cpfLimpo = (cpf || '').replace(/\D/g, '');
   console.log('DEBUG CPF para Abacatepay:', cpf, 'Limpo:', cpfLimpo);
 
-  if (!/^\d{11}$/.test(cpfLimpo)) {
+  if (!validarCPF(cpfLimpo)) {
     return res.status(400).json({ error: "CPF inválido para pagamento (taxId)" });
   }
 
@@ -90,6 +105,7 @@ app.post('/api/pagamento', async (req, res) => {
   }
 
   try {
+    // 1. Cria a cobrança
     const abacateRes = await fetch("https://api.abacatepay.com/v1/billing/create", {
       method: "POST",
       headers: {
@@ -109,7 +125,7 @@ app.post('/api/pagamento', async (req, res) => {
             price: Math.round(valor * 100) // em centavos
           }
         ],
-        returnUrl: "https://seusite.com/voltar", // coloque o endereço do seu site
+        returnUrl: "https://seusite.com/voltar",
         completionUrl: "https://seusite.com/obrigado",
         customer: {
           name: nome,
@@ -120,21 +136,42 @@ app.post('/api/pagamento', async (req, res) => {
       }),
     });
 
-    if (!abacateRes.ok) {
-      const error = await abacateRes.text();
-      console.error("Erro Abacatepay:", error);
-      return res.status(500).json({ error: "Erro Abacatepay: " + error });
-    }
-
     const data = await abacateRes.json();
     console.log("RESPOSTA ABACATEPAY:", data);
 
+    if (!data.data || !data.data.id) {
+      return res.status(500).json({ error: "Erro ao criar cobrança. Tente novamente." });
+    }
+
+    // 2. Busca o QR Code Pix
+    const billingId = data.data.id;
+    const qrRes = await fetch(`https://api.abacatepay.com/v1/pix/qrcode/${billingId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "accept": "application/json"
+      }
+    });
+    const qrData = await qrRes.json();
+    console.log("RESPOSTA QRCODE PIX:", qrData);
+
+    if (!qrData.data || !qrData.data.qrcode || !qrData.data.copiaecola) {
+      // Se não vier o qrcode, ao menos envie a url
+      return res.status(200).json({
+        url: data.data.url,
+        id: billingId,
+        valor,
+        descricao
+      });
+    }
+
     res.status(200).json({
-      qrcode: data.qrcode,
-      copiaecola: data.copiaecola,
-      id: data.id,
+      qrcode: qrData.data.qrcode,
+      copiaecola: qrData.data.copiaecola,
+      id: billingId,
       valor,
       descricao,
+      url: data.data.url
     });
   } catch (e) {
     console.error("Erro interno:", e);
@@ -142,7 +179,6 @@ app.post('/api/pagamento', async (req, res) => {
   }
 });
 
-// --- Start Server ---
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
