@@ -358,7 +358,6 @@ const resposta = await fetch('/api/pagamento', {
     cellphone
   }),
 });
-      });
       const data = await resposta.json();
 
       if (data.qrcode) {
