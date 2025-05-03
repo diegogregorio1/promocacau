@@ -341,10 +341,23 @@ if (botaoPagarPix) {
     botaoPagarPix.textContent = "Gerando Pix...";
 
     try {
-      const resposta = await fetch('/api/pagamento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frete: tipoFrete }),
+      // Pegue os dados do formulário
+const nome = document.getElementById('nome').value;
+const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
+const email = document.getElementById('email').value;
+const cellphone = document.getElementById('numero').value;
+
+const resposta = await fetch('/api/pagamento', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    frete: tipoFrete,
+    nome,
+    cpf,
+    email,
+    cellphone
+  }),
+});
       });
       const data = await resposta.json();
 
