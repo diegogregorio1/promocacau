@@ -201,7 +201,16 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ cpf, email })
+        const nome = nomeInput.value.trim();
+const cpf = cpfInput.value.replace(/\D/g, '');
+const email = emailInput.value.trim();
+let cellphone = numeroInput.value.replace(/\D/g, '');
+
+if (cellphone.length === 11 && !cellphone.startsWith('+55')) {
+  cellphone = '+55' + cellphone;
+}
+
+body: JSON.stringify({ nome, cpf, email, cellphone })
       });
 
       const resultado = await resposta.json();
