@@ -106,7 +106,7 @@ app.post('/api/pagamento', async (req, res) => {
     customer: {
       name: "Cliente",
       email: "cliente@email.com",
-      phone: "+5500000000000",
+      cellphone: "+5500000000000",
       document: "12345678900"
     }
   }),
