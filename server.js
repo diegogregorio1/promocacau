@@ -107,7 +107,7 @@ app.post('/api/pagamento', async (req, res) => {
       name: "Cliente",
       email: "cliente@email.com",
       cellphone: "+5500000000000",
-      document: "12345678900"
+      taxId: "12345678900"
     }
   }),
 });
