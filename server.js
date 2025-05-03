@@ -125,8 +125,8 @@ app.post('/api/pagamento', async (req, res) => {
             price: Math.round(valor * 100) // em centavos
           }
         ],
-        returnUrl: "https://seusite.com/voltar",
-        completionUrl: "https://seusite.com/obrigado",
+        returnUrl: "https://cacaushowpromo.onrender.com/",
+        completionUrl: "https://cacaushowpromo.onrender.com/confirmacao.html",
         customer: {
           name: nome,
           email: email,
