@@ -2,7 +2,6 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { google } = require('googleapis');
-const fetch = require('node-fetch');
 require('dotenv').config();
 
 const app = express();
@@ -77,105 +76,54 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
+// =============================
+// PAGAMENTO MERCADO PAGO PIX
+// =============================
+
+let mercadopago;
+try {
+  mercadopago = require('./mercadopago-config');
+} catch (e) {
+  mercadopago = require('mercadopago');
+  mercadopago.configure({
+    access_token: process.env.MP_ACCESS_TOKEN || 'SUA_ACCESS_TOKEN_AQUI'
+  });
+}
+
 app.post('/api/pagamento', async (req, res) => {
-  const { frete, referencia, nome, email, cellphone, cpf } = req.body;
+  // Você pode receber valores do frontend ou definir valores fixos para teste
+  const valor = 17.99; // troque pelo valor desejado ou calcule de acordo com o frete/produto
+  const descricao = "Frete PAC"; // troque conforme necessário
 
-  const cpfLimpo = (cpf || '').replace(/\D/g, '');
-  console.log('DEBUG CPF para Abacatepay:', cpf, 'Limpo:', cpfLimpo);
-
-  if (!validarCPF(cpfLimpo)) {
-    return res.status(400).json({ error: "CPF inválido para pagamento (taxId)" });
-  }
-
-  let valor, descricao;
-  if (frete === "pac") {
-    valor = 17.99;
-    descricao = "Frete PAC";
-  } else if (frete === "sedex") {
-    valor = 29.99;
-    descricao = "Frete SEDEX";
-  } else {
-    console.error("Frete inválido:", frete);
-    return res.status(400).json({ error: "Frete inválido" });
-  }
-
-  const token = process.env.ABACATEPAY_TOKEN;
-  if (!token) {
-    return res.status(500).json({ error: "Token Abacatepay não configurado" });
-  }
+  const preference = {
+    items: [
+      {
+        title: descricao,
+        unit_price: valor,
+        quantity: 1,
+      },
+    ],
+    payment_methods: {
+      excluded_payment_types: [
+        { id: 'credit_card' },
+        { id: 'ticket' }
+      ]
+      // Assim, só Pix ficará disponível no Checkout Pro
+    },
+    back_urls: {
+      success: "https://cacaushowpromo.onrender.com/sucesso.html",
+      failure: "https://cacaushowpromo.onrender.com/erro.html",
+      pending: "https://cacaushowpromo.onrender.com/pendente.html"
+    },
+    auto_return: "approved"
+  };
 
   try {
-    // 1. Cria a cobrança
-    const abacateRes = await fetch("https://api.abacatepay.com/v1/billing/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-        "accept": "application/json"
-      },
-      body: JSON.stringify({
-        frequency: "ONE_TIME",
-        methods: ["PIX"],
-        products: [
-          {
-            externalId: referencia || "frete_" + Date.now(),
-            name: descricao,
-            description: descricao,
-            quantity: 1,
-            price: Math.round(valor * 100) // em centavos
-          }
-        ],
-        returnUrl: "https://cacaushowpromo.onrender.com/",
-        completionUrl: "https://cacaushowpromo.onrender.com/confirmacao.html",
-        customer: {
-          name: nome,
-          email: email,
-          cellphone: cellphone,
-          taxId: cpfLimpo
-        }
-      }),
-    });
-
-    const data = await abacateRes.json();
-    console.log("RESPOSTA ABACATEPAY:", data);
-
-    if (!data.data || !data.data.id) {
-      return res.status(500).json({ error: "Erro ao criar cobrança. Tente novamente." });
-    }
-
-    // 2. Busca o QR Code Pix
-    const billingId = data.data.id;
-    const qrRes = await fetch(`https://api.abacatepay.com/v1/pix/qrcode/${billingId}`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "accept": "application/json"
-      }
-    });
-    const qrData = await qrRes.json();
-    console.log("RESPOSTA QRCODE PIX:", qrData);
-
-    if (!qrData.data || !qrData.data.qrcode || !qrData.data.copiaecola) {
-      // Se não vier o qrcode, ao menos envie a url
-      return res.status(200).json({
-        url: data.data.url,
-        id: billingId,
-        valor,
-        descricao
-      });
-    }
-
-    res.status(200).json({
-      qrcode: qrData.data.qrcode,
-      copiaecola: qrData.data.copiaecola,
-      id: billingId,
-      valor,
-      descricao,
-      url: data.data.url
-    });
-  } catch (e) {
-    console.error("Erro interno:", e);
-    res.status(500).json({ error: "Erro interno no servidor: " + e.message });
+    const response = await mercadopago.preferences.create(preference);
+    res.json({ init_point: response.body.init_point });
+  } catch (error) {
+    console.error("Erro Mercado Pago:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
