@@ -171,14 +171,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const nomeInput = document.getElementById('nome');
   const cpfInput = document.getElementById('cpf');
   const emailInput = document.getElementById('email');
-  const cellphoneInput = document.getElementById('cellphone'); // ALTERADO: Agora reflete o campo correto de celular
+  const cellphoneInput = document.getElementById('cellphone');
   const botaoAvancar = document.getElementById('botaoAvancarDados');
 
   function validarDadosObrigatorios() {
     const nomeValido = nomeInput.value.trim().length > 4;
     const cpfValido = cpfInput.value.replace(/\D/g, '').length === 11;
     const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value);
-    const numeroValido = cellphoneInput.value.trim().length > 0; // ALTERADO: Agora valida o campo de celular
+    const numeroValido = cellphoneInput.value.trim().length > 0;
     botaoAvancar.disabled = !(nomeValido && cpfValido && emailValido && numeroValido);
   }
 
@@ -194,9 +194,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Pegando todos os campos obrigatórios
     const nome = nomeInput.value.trim();
-    const cpf = cpfInput.value.replace(/\D/g, ''); // remove pontos e traços
+    const cpf = cpfInput.value.replace(/\D/g, '');
     const email = emailInput.value.trim();
-    let cellphone = cellphoneInput.value.replace(/\D/g, ''); // ALTERADO: usa campo correto
+    let cellphone = cellphoneInput.value.replace(/\D/g, '');
 
     // Adiciona o +55 se o telefone tiver 11 dígitos e não começar com +55
     if (cellphone.length === 11 && !cellphone.startsWith('+55')) {
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Endereço completo
       let rua = document.getElementById('rua').value;
-      let numeroResidencia = document.getElementById('numero').value; // número da residência
+      let numeroResidencia = document.getElementById('numero').value;
       let complemento = document.getElementById('complemento').value;
       let bairro = document.getElementById('bairro').value;
       let cidade = document.getElementById('cidade').value;
@@ -320,8 +320,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ENVIO FINAL NÃO É MAIS NECESSÁRIO, POIS O ENVIO OCORREU ANTES
-
   if (botaoVoltarConfirmacao) {
     botaoVoltarConfirmacao.addEventListener('click', () => {
       etapaConfirmacao.classList.remove('etapa-ativa');
@@ -341,19 +339,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
       let tipoFrete = freteSelecionado ? freteSelecionado.value.toLowerCase() : null; // 'pac' ou 'sedex'
       if (!tipoFrete) {
-        alert('Selecione o tipo de frete para gerar o Pix.');
+        alert('Selecione o tipo de frete para gerar o pagamento.');
         return;
       }
 
       botaoPagarPix.disabled = true;
-      botaoPagarPix.textContent = "Gerando Pix...";
+      botaoPagarPix.textContent = "Gerando pagamento...";
 
       try {
         // Pegue os dados do formulário
         const nome = document.getElementById('nome').value;
         const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
         const email = document.getElementById('email').value;
-        let cellphone = document.getElementById('cellphone').value.replace(/\D/g, ''); // ALTERADO: usa campo correto
+        let cellphone = document.getElementById('cellphone').value.replace(/\D/g, '');
         if (cellphone.length === 11 && !cellphone.startsWith('+55')) {
           cellphone = '+55' + cellphone;
         }
@@ -371,39 +369,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const data = await resposta.json();
 
-        if (data.qrcode) {
-          // Crie ou atualize um elemento para exibir o QR Code e copia-e-cola
-          let divPix = document.getElementById('pix-info');
-          if (!divPix) {
-            divPix = document.createElement('div');
-            divPix.id = 'pix-info';
-            botaoPagarPix.parentElement.appendChild(divPix);
-          }
-          divPix.innerHTML = `
-            <h3>Escaneie o QR Code com seu app bancário:</h3>
-            <img src="data:image/png;base64,${data.qrcode}" alt="Pix QR Code" style="max-width:300px;display:block;margin:0 auto 16px;" />
-            <p>Valor: R$ ${data.valor.toFixed(2)}</p>
-            <b>Copia e cola Pix:</b>
-            <textarea readonly style="width:100%;font-size:1.1em;">${data.copiaecola}</textarea>
-          `;
-        } else if (data.url) {
-          // Fallback: exibe link caso não venha o QR Code
-          let divPix = document.getElementById('pix-info');
-          if (!divPix) {
-            divPix = document.createElement('div');
-            divPix.id = 'pix-info';
-            botaoPagarPix.parentElement.appendChild(divPix);
-          }
-          divPix.innerHTML = `
-            <h3>Clique para pagar via Abacatepay:</h3>
-            <a href="${data.url}" target="_blank" style="font-size:1.3em;color:#16a085;">Pagar com PIX</a>
-            <p>Após o pagamento, siga as instruções no site da Abacatepay.</p>
-          `;
+        if (data.init_point) {
+          // Novo fluxo Mercado Pago: redireciona para o checkout do Mercado Pago
+          window.location.href = data.init_point;
         } else {
-          alert('Erro ao gerar Pix: ' + (data.error || 'Tente novamente'));
+          alert('Erro ao gerar pagamento: ' + (data.error || 'Tente novamente'));
         }
       } catch (erro) {
-        alert('Erro ao gerar Pix. Tente novamente.');
+        alert('Erro ao gerar pagamento. Tente novamente.');
       }
       botaoPagarPix.disabled = false;
       botaoPagarPix.textContent = "Pagar com PIX";
