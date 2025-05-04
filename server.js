@@ -111,7 +111,7 @@ app.post('/api/pagamento', async (req, res) => {
       // Assim, só Pix ficará disponível no Checkout Pro
     },
     back_urls: {
-      success: "https://cacaushowpromo.onrender.com/sucesso.html",
+      success: "https://cacaushowpromo.onrender.com/confirmacao.html",
       failure: "https://cacaushowpromo.onrender.com/erro.html",
       pending: "https://cacaushowpromo.onrender.com/pendente.html"
     },
