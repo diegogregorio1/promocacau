@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { google } = require('googleapis');
 require('dotenv').config();
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -77,21 +78,11 @@ app.post('/api/registrar', async (req, res) => {
 });
 
 // =============================
-// PAGAMENTO MERCADO PAGO PIX
+// PAGAMENTO MERCADO PAGO PIX (API REST)
 // =============================
 
-let mercadopago;
-try {
-  mercadopago = require('./mercadopago-config');
-} catch (e) {
-  mercadopago = require('mercadopago');
-  mercadopago.configure({
-    access_token: process.env.MP_ACCESS_TOKEN || 'SUA_ACCESS_TOKEN_AQUI'
-  });
-}
-
 app.post('/api/pagamento', async (req, res) => {
-  // Você pode receber valores do frontend ou definir valores fixos para teste
+  // Pegue os valores do frontend ou defina valores fixos para teste
   const valor = 17.99; // troque pelo valor desejado ou calcule de acordo com o frete/produto
   const descricao = "Frete PAC"; // troque conforme necessário
 
@@ -101,6 +92,7 @@ app.post('/api/pagamento', async (req, res) => {
         title: descricao,
         unit_price: valor,
         quantity: 1,
+        currency_id: 'BRL'
       },
     ],
     payment_methods: {
@@ -115,12 +107,25 @@ app.post('/api/pagamento', async (req, res) => {
       failure: "https://cacaushowpromo.onrender.com/erro.html",
       pending: "https://cacaushowpromo.onrender.com/pendente.html"
     },
-    auto_return: "approved"
+    auto_return: "all"
   };
 
   try {
-    const response = await mercadopago.preferences.create(preference);
-    res.json({ init_point: response.body.init_point });
+    // Usando fetch para acessar a API REST do Mercado Pago
+    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN || 'SUA_ACCESS_TOKEN_AQUI'}`
+      },
+      body: JSON.stringify(preference)
+    });
+    const response = await mpResponse.json();
+    if (response.init_point) {
+      res.json({ init_point: response.init_point });
+    } else {
+      res.status(500).json({ error: 'Erro ao criar preferência', details: response });
+    }
   } catch (error) {
     console.error("Erro Mercado Pago:", error);
     res.status(500).json({ error: error.message });
