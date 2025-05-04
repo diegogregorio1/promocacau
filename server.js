@@ -83,8 +83,16 @@ app.post('/api/registrar', async (req, res) => {
 
 app.post('/api/pagamento', async (req, res) => {
   // Pegue os valores do frontend ou defina valores fixos para teste
-  const valor = 17.99; // troque pelo valor desejado ou calcule de acordo com o frete/produto
-  const descricao = "Frete PAC"; // troque conforme necessário
+  const { frete } = req.body; // recebe do frontend
+
+let valor, descricao;
+if (frete === 'sedex') {
+  valor = 29.99;
+  descricao = "Frete SEDEX";
+} else {
+  valor = 17.99;
+  descricao = "Frete PAC";
+}
 
   const preference = {
     items: [
