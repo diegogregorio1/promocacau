@@ -1,9 +1,8 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
 const { google } = require('googleapis');
+const axios = require('axios');
 require('dotenv').config();
-const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,6 +39,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Rota de cadastro (planilha Google)
 app.post('/api/registrar', async (req, res) => {
   const { nome, cpf, email, cellphone } = req.body;
   if (!nome || !cpf || !email || !cellphone) {
@@ -77,66 +77,73 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
-// =============================
-// PAGAMENTO MERCADO PAGO PIX (API REST)
-// =============================
+// =========== PAGAMENTO VIA PIX EFI/GERENCIANET =============
 
-app.post('/api/pagamento', async (req, res) => {
-  // Pegue os valores do frontend ou defina valores fixos para teste
-  const { frete } = req.body; // recebe do frontend
+// Endpoint para gerar cobrança Pix (QR Code)
+app.post('/api/gerar-pix', async (req, res) => {
+  const { frete } = req.body; // recebe do frontend: 'sedex' ou outro
 
-let valor, descricao;
-if (frete === 'sedex') {
-  valor = 29.99;
-  descricao = "Frete SEDEX";
-} else {
-  valor = 17.99;
-  descricao = "Frete PAC";
-}
+  let valor, descricao;
+  if (frete === 'sedex') {
+    valor = "29.99";
+    descricao = "Frete SEDEX";
+  } else {
+    valor = "17.99";
+    descricao = "Frete PAC";
+  }
 
-  const preference = {
-    items: [
-      {
-        title: descricao,
-        unit_price: valor,
-        quantity: 1,
-        currency_id: 'BRL'
-      },
-    ],
-    payment_methods: {
-      excluded_payment_types: [
-        { id: 'credit_card' },
-        { id: 'ticket' }
-      ]
-      // Assim, só Pix ficará disponível no Checkout Pro
-    },
-    back_urls: {
-      success: "https://cacaushowpromo.onrender.com/confirmacao.html",
-      failure: "https://cacaushowpromo.onrender.com/erro.html",
-      pending: "https://cacaushowpromo.onrender.com/pendente.html"
-    },
-    auto_return: "all"
-  };
+  const CLIENT_ID = process.env.CLIENT_ID;
+  const CLIENT_SECRET = process.env.CLIENT_SECRET;
+  const CHAVE_PIX = process.env.CHHAVE_PIX || process.env.CHAVE_PIX;
+
+  if (!CLIENT_ID || !CLIENT_SECRET || !CHAVE_PIX) {
+    return res.status(500).json({ erro: 'Credenciais Pix não configuradas corretamente.' });
+  }
 
   try {
-    // Usando fetch para acessar a API REST do Mercado Pago
-    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN || 'SUA_ACCESS_TOKEN_AQUI'}`
-      },
-      body: JSON.stringify(preference)
+    // 1. Obter access token
+    const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+    const tokenResponse = await axios.post(
+      'https://api.gerencianet.com.br/v1/authorize',
+      'grant_type=client_credentials',
+      {
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
+    const accessToken = tokenResponse.data.access_token;
+
+    // 2. Criar cobrança Pix
+    const payload = {
+      calendario: { expiracao: 3600 },
+      valor: { original: valor },
+      chave: CHAVE_PIX,
+      solicitacaoPagador: descricao,
+    };
+
+    const pixResponse = await axios.post(
+      'https://api.gerencianet.com.br/v2/cob',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    // 3. Retornar QR code e Pix copia e cola
+    const cob = pixResponse.data;
+    res.json({
+      qrcode: cob.loc.imagemQrcode || null, // URL da imagem QR Code (se disponível)
+      copiaecola: cob.pixCopiaECola || null // Código Pix Copia e Cola (se disponível)
     });
-    const response = await mpResponse.json();
-    if (response.init_point) {
-      res.json({ init_point: response.init_point });
-    } else {
-      res.status(500).json({ error: 'Erro ao criar preferência', details: response });
-    }
+
   } catch (error) {
-    console.error("Erro Mercado Pago:", error);
-    res.status(500).json({ error: error.message });
+    console.error(error.response?.data || error);
+    res.status(500).json({ erro: 'Erro ao gerar cobrança Pix' });
   }
 });
 
