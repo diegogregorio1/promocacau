@@ -289,7 +289,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Frete
       const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
-      let tipoFrete = freteSelecionado ? freteSelecionado.value : "";
+      let tipoFrete = freteSelecionado ?
+        freteSelecionado.value : "";
+
       let valorFrete = freteSelecionado ?
         (freteSelecionado.value === "PAC" ? "R$ 17,99" : "R$ 29,99") : "";
 
@@ -332,10 +334,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Sucesso não tem voltar!
+  // =============== PAGAMENTO PIX INTEGRAÇÃO ===============
+  // Cria dinamicamente o bloco para exibir Pix (QR Code e copia e cola)
+  const pagamentoArea = document.querySelector('.pagamento-area .pagamento-pix');
+  let pixResultDiv = document.createElement('div');
+  pixResultDiv.id = 'pixResult';
+  pixResultDiv.style.display = 'none';
+  pixResultDiv.style.marginTop = '16px';
+  pixResultDiv.innerHTML = `
+    <div id="pixQRCodeArea" style="text-align: center; margin-bottom: 10px;">
+      <img id="pixQRCodeImg" src="" alt="QR Code Pix" style="max-width: 260px;display:block;margin:0 auto 10px;">
+    </div>
+    <div id="pixCopiaColaArea" style="margin-bottom:10px;">
+      <strong>Copia e Cola:</strong>
+      <span id="pixCopiaCola" style="word-break: break-all; font-size:1.1em;"></span>
+      <button type="button" id="botaoCopiarPix" style="margin-left: 6px;">Copiar código</button>
+    </div>
+    <div id="pixAviso" style="color: #43a047; font-size: 1em;"></div>
+  `;
+  pagamentoArea.appendChild(pixResultDiv);
+
   if (botaoPagarPix) {
     botaoPagarPix.addEventListener('click', async () => {
-      // Descobre o frete selecionado (PAC ou SEDEX)
       const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
       let tipoFrete = freteSelecionado ? freteSelecionado.value.toLowerCase() : null; // 'pac' ou 'sedex'
       if (!tipoFrete) {
@@ -344,42 +364,54 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       botaoPagarPix.disabled = true;
-      botaoPagarPix.textContent = "Gerando pagamento...";
+      botaoPagarPix.textContent = "Gerando QR Code...";
+
+      // Oculta resultado anterior se existir
+      pixResultDiv.style.display = 'none';
+      document.getElementById('pixAviso').textContent = '';
 
       try {
-        // Pegue os dados do formulário
-        const nome = document.getElementById('nome').value;
-        const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
-        const email = document.getElementById('email').value;
-        let cellphone = document.getElementById('cellphone').value.replace(/\D/g, '');
-        if (cellphone.length === 11 && !cellphone.startsWith('+55')) {
-          cellphone = '+55' + cellphone;
-        }
-
-        const resposta = await fetch('/api/pagamento', {
+        // Chama o endpoint Pix do backend!
+        const resposta = await fetch('/api/gerar-pix', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            frete: tipoFrete,
-            nome,
-            cpf,
-            email,
-            cellphone
-          }),
+          body: JSON.stringify({ frete: tipoFrete })
         });
         const data = await resposta.json();
 
-        if (data.init_point) {
-          // Novo fluxo Mercado Pago: redireciona para o checkout do Mercado Pago
-          window.location.href = data.init_point;
+        if (data.qrcode || data.copiaecola) {
+          // Exibe resultado Pix
+          if (data.qrcode) {
+            document.getElementById('pixQRCodeImg').src = data.qrcode;
+            document.getElementById('pixQRCodeImg').style.display = '';
+          } else {
+            document.getElementById('pixQRCodeImg').style.display = 'none';
+          }
+          document.getElementById('pixCopiaCola').textContent = data.copiaecola || '';
+          pixResultDiv.style.display = 'block';
+          document.getElementById('pixAviso').textContent = "Escaneie ou copie o código para pagar. Após o pagamento, a equipe confirmará seu pedido!";
         } else {
-          alert('Erro ao gerar pagamento: ' + (data.error || 'Tente novamente'));
+          alert('Não foi possível gerar o QR Code Pix. Tente novamente.');
         }
       } catch (erro) {
-        alert('Erro ao gerar pagamento. Tente novamente.');
+        alert('Erro ao gerar o pagamento Pix. Tente novamente.');
       }
+
       botaoPagarPix.disabled = false;
       botaoPagarPix.textContent = "Pagar com PIX";
     });
   }
+
+  // Evento para copiar código Pix ao clicar no botão
+  pagamentoArea.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'botaoCopiarPix') {
+      const codigo = document.getElementById('pixCopiaCola').textContent;
+      if (codigo) {
+        navigator.clipboard.writeText(codigo);
+        document.getElementById('pixAviso').textContent = "Código Pix copiado para a área de transferência!";
+      }
+    }
+  });
+
+  // =============== FIM PAGAMENTO PIX INTEGRAÇÃO ===============
 });
