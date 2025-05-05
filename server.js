@@ -1,13 +1,11 @@
 const express = require('express');
 const path = require('path');
 const { google } = require('googleapis');
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Gerencianet/EFI SDK
-const EfiPay = require('@efipay/efipay');
 
 const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
 
@@ -94,7 +92,6 @@ app.post('/api/gerar-pix', async (req, res) => {
     descricao = "Frete PAC";
   }
 
-  // Carrega credenciais do .env
   const CLIENT_ID = process.env.CLIENT_ID;
   const CLIENT_SECRET = process.env.CLIENT_SECRET;
   const CHAVE_PIX = process.env.CHAVE_PIX;
@@ -103,46 +100,10 @@ app.post('/api/gerar-pix', async (req, res) => {
     return res.status(500).json({ erro: 'Credenciais Pix não configuradas corretamente.' });
   }
 
-  // Configuração para SDK EFI/Gerencianet
-  const options = {
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
-    sandbox: false // true se estiver usando ambiente de testes
-  };
-
-  const efipay = new EfiPay(options);
-
-  const chargeBody = {
-    calendario: { expiracao: 3600 },
-    valor: { original: valor },
-    chave: CHAVE_PIX,
-    solicitacaoPagador: descricao,
-  };
-
   try {
-    // Cria a cobrança Pix
-    const cob = await efipay.pixCreateImmediateCharge([], chargeBody);
-
-    // Gera o QR Code para a cobrança
-    const locId = cob.loc && cob.loc.id;
-    let qrcode = null, copiaecola = null;
-    if (locId) {
-      const qr = await efipay.pixGenerateQRCode({ id: locId });
-      qrcode = qr.imagemQrcode;
-      copiaecola = qr.qrcode;
-    }
-
-    res.json({
-      qrcode: qrcode || null, // URL da imagem QR Code
-      copiaecola: copiaecola || null // Código Pix Copia e Cola
-    });
-
-  } catch (error) {
-    console.error(error.response?.data || error);
-    res.status(500).json({ erro: 'Erro ao gerar cobrança Pix' });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+    // 1. Obter access token
+    const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+    const tokenResponse = await axios.post(
+      'https://api.gerencianet.com.br/v1/authorize',
+      'grant_type=client_credentials',
+      {
