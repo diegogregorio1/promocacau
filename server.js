@@ -107,3 +107,60 @@ app.post('/api/gerar-pix', async (req, res) => {
       'https://api.gerencianet.com.br/v1/authorize',
       'grant_type=client_credentials',
       {
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
+    const accessToken = tokenResponse.data.access_token;
+
+    // 2. Criar cobrança Pix
+    const payload = {
+      calendario: { expiracao: 3600 },
+      valor: { original: valor },
+      chave: CHAVE_PIX,
+      solicitacaoPagador: descricao,
+    };
+
+    const pixResponse = await axios.post(
+      'https://api.gerencianet.com.br/v2/cob',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    // 3. Gerar o QR Code para a cobrança
+    const locId = pixResponse.data.loc && pixResponse.data.loc.id;
+    let qrcode = null, copiaecola = null;
+    if (locId) {
+      const qrResponse = await axios.get(
+        `https://api.gerencianet.com.br/v2/loc/${locId}/qrcode`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          }
+        }
+      );
+      qrcode = qrResponse.data.imagemQrcode;
+      copiaecola = qrResponse.data.qrcode;
+    }
+
+    res.json({
+      qrcode: qrcode || null, // URL da imagem QR Code
+      copiaecola: copiaecola || null // Código Pix Copia e Cola
+    });
+
+  } catch (error) {
+    console.error(error.response?.data || error);
+    res.status(500).json({ erro: 'Erro ao gerar cobrança Pix' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
