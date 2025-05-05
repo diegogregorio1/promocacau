@@ -103,16 +103,16 @@ app.post('/api/gerar-pix', async (req, res) => {
   try {
     // 1. Obter access token
     const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
-    const tokenResponse = await axios.post(
-      'https://api.gerencianet.com.br/v1/authorize',
-      'grant_type=client_credentials',
-      {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
-    );
+const tokenResponse = await axios.post(
+  'https://api-pix-h.gerencianet.com.br/v1/authorize',
+  'grant_type=client_credentials',
+  {
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  }
+);
     const accessToken = tokenResponse.data.access_token;
 
     // 2. Criar cobrança Pix
@@ -123,29 +123,29 @@ app.post('/api/gerar-pix', async (req, res) => {
       solicitacaoPagador: descricao,
     };
 
-    const pixResponse = await axios.post(
-      'https://api.gerencianet.com.br/v2/cob',
-      payload,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+   const pixResponse = await axios.post(
+  'https://api-pix-h.gerencianet.com.br/v2/cob',
+  payload,
+  {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  }
+);
 
     // 3. Gerar o QR Code para a cobrança
     const locId = pixResponse.data.loc && pixResponse.data.loc.id;
     let qrcode = null, copiaecola = null;
     if (locId) {
       const qrResponse = await axios.get(
-        `https://api.gerencianet.com.br/v2/loc/${locId}/qrcode`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          }
-        }
-      );
+  `https://api-pix-h.gerencianet.com.br/v2/loc/${locId}/qrcode`,
+  {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    }
+  }
+);
       qrcode = qrResponse.data.imagemQrcode;
       copiaecola = qrResponse.data.qrcode;
     }
