@@ -3,7 +3,6 @@ const path = require('path');
 const { google } = require('googleapis');
 const axios = require('axios');
 const fs = require('fs');
-const https = require('https');
 require('dotenv').config();
 
 const app = express();
@@ -40,20 +39,6 @@ async function getSheetsClient() {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-
-// ----------- RECONSTRÓI O CERTIFICADO A PARTIR DO BASE64 (Render) -----------
-const certsDir = path.join(__dirname, 'certs');
-const certPath = path.join(certsDir, 'certificado.p12');
-if (process.env.CERT_P12_BASE64) {
-  if (!fs.existsSync(certsDir)) {
-    fs.mkdirSync(certsDir, { recursive: true });
-  }
-  fs.writeFileSync(certPath, Buffer.from(process.env.CERT_P12_BASE64, 'base64'));
-  console.log('Certificado .p12 reconstruído com sucesso!');
-} else {
-  console.warn('[AVISO] CERT_P12_BASE64 não está definida! Recurso Pix ficará indisponível.');
-}
-// ----------------------------------------------------------------------------
 
 // Rota de cadastro (planilha Google)
 app.post('/api/registrar', async (req, res) => {
@@ -93,27 +78,33 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
-// =========== PAGAMENTO VIA PIX EFI/GERENCIANET =============
+// =========== PAGAMENTO VIA PIX PAGSEGURO =============
 
-// Carregue o certificado reconstruído
-let p12;
-try {
-  p12 = fs.readFileSync(certPath);
-} catch (err) {
-  console.warn('[AVISO] Certificado Pix .p12 não encontrado. Recurso Pix ficará indisponível até corrigir isto.');
+// Função para obter o access_token do PagSeguro
+async function getPagseguroToken() {
+  const tokenUrl = 'https://oauth.api.pagseguro.com/oauth2/token';
+  const clientId = process.env.PAGSEGURO_CLIENT_ID;
+  const clientSecret = process.env.PAGSEGURO_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error('PAGSEGURO_CLIENT_ID ou PAGSEGURO_CLIENT_SECRET não configurados.');
+  }
+
+  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  try {
+    const response = await axios.post(tokenUrl, 'grant_type=client_credentials', {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${auth}`
+      }
+    });
+    return response.data.access_token;
+  } catch (err) {
+    throw new Error('Erro ao obter access_token do PagSeguro. Detalhes: ' + (err.response?.data?.error_description || err.message));
+  }
 }
 
-// Crie o httpsAgent usando o certificado .p12 (PKCS#12)
-let httpsAgent;
-if (p12) {
-  httpsAgent = new https.Agent({
-    pfx: p12,
-    passphrase: process.env.CERT_PASSWORD || '', // senha do .p12
-    rejectUnauthorized: true,
-  });
-}
-
-// Endpoint para gerar cobrança Pix (QR Code)
+// Endpoint para gerar cobrança Pix (PagSeguro)
 app.post('/api/gerar-pix', async (req, res) => {
   const { frete } = req.body; // recebe do frontend: 'sedex' ou outro
 
@@ -126,85 +117,54 @@ app.post('/api/gerar-pix', async (req, res) => {
     descricao = "Frete PAC";
   }
 
-  const CLIENT_ID = process.env.CLIENT_ID;
-  const CLIENT_SECRET = process.env.CLIENT_SECRET;
-  const CHAVE_PIX = process.env.CHAVE_PIX;
+  const PAGSEGURO_PIX_KEY = process.env.PAGSEGURO_PIX_KEY;
 
-  if (!CLIENT_ID || !CLIENT_SECRET || !CHAVE_PIX) {
-    return res.status(500).json({ erro: 'Credenciais Pix não configuradas corretamente.' });
-  }
-
-  if (!httpsAgent) {
-    return res.status(500).json({ erro: 'Certificado Pix não configurado no servidor.' });
+  if (!process.env.PAGSEGURO_CLIENT_ID || !process.env.PAGSEGURO_CLIENT_SECRET || !PAGSEGURO_PIX_KEY) {
+    return res.status(500).json({ erro: 'Credenciais PagSeguro não configuradas corretamente.' });
   }
 
   try {
-    // 1. Obter access token (endpoint de PRODUÇÃO)
-    const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
-    const tokenResponse = await axios.post(
-      'https://api-pix.gerencianet.com.br/oauth/token',
-      { grant_type: 'client_credentials' },
-      {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/json',
-        },
-        httpsAgent
-      }
-    );
-    const accessToken = tokenResponse.data.access_token;
+    // 1. Obter access token
+    const access_token = await getPagseguroToken();
 
-    // 2. Criar cobrança Pix (endpoint de PRODUÇÃO)
+    // 2. Criar cobrança Pix
     const payload = {
       calendario: { expiracao: 3600 },
       valor: { original: valor },
-      chave: CHAVE_PIX,
-      solicitacaoPagador: descricao,
+      chave: PAGSEGURO_PIX_KEY,
+      solicitacaoPagador: descricao
     };
 
     const pixResponse = await axios.post(
-      'https://api-pix.gerencianet.com.br/v2/cob',
+      'https://pix.api.pagseguro.com/pix/v2/cob',
       payload,
       {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
-        },
-        httpsAgent
+        }
       }
     );
 
-    // 3. Gerar o QR Code para a cobrança (endpoint de PRODUÇÃO)
-    const locId = pixResponse.data.loc && pixResponse.data.loc.id;
-    let qrcode = null, copiaecola = null;
-    if (locId) {
-      const qrResponse = await axios.get(
-        `https://api-pix.gerencianet.com.br/v2/loc/${locId}/qrcode`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          httpsAgent
+    // 3. Gerar o QR Code e copia e cola
+    const txid = pixResponse.data.txid;
+    const qrcodeResp = await axios.get(
+      `https://pix.api.pagseguro.com/pix/v2/cob/${txid}/qrcode`,
+      {
+        headers: {
+          'Authorization': `Bearer ${access_token}`
         }
-      );
-      qrcode = qrResponse.data.imagemQrcode;
-      copiaecola = qrResponse.data.qrcode;
-    }
+      }
+    );
 
     res.json({
-      qrcode: qrcode || null, // URL da imagem QR Code
-      copiaecola: copiaecola || null // Código Pix Copia e Cola
+      qrcode: qrcodeResp.data.imagemQrcode, // Base64 da imagem QRCode
+      copiaecola: qrcodeResp.data.qrcode    // Código Pix Copia e Cola
     });
 
   } catch (error) {
-    // Só mostre detalhes completos em ambiente de desenvolvimento!
-    if (process.env.NODE_ENV === 'development') {
-      console.error(error.response?.data || error);
-      res.status(500).json({ erro: error.response?.data || error.message });
-    } else {
-      console.error(error.response?.data || error);
-      res.status(500).json({ erro: 'Erro ao gerar cobrança Pix' });
-    }
+    console.error('[ERRO PagSeguro Pix]:', error.response?.data || error.message || error);
+    res.status(500).json({ erro: 'Erro ao gerar cobrança Pix PagSeguro', detalhes: error.response?.data || error.message || error });
   }
 });
 
