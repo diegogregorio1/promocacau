@@ -44,12 +44,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // ETAPA 1: Pesquisa
   const pesquisaForm = document.getElementById('pesquisa-form');
   const selects = pesquisaForm.querySelectorAll('select');
+  // Ativa o botão no carregamento (caso o usuário volte no histórico e as respostas estejam preenchidas)
+  function verificaTodosPreenchidos() {
+    const todosPreenchidos = Array.from(selects).every(e => e.value !== "");
+    botaoProximo1.disabled = !todosPreenchidos;
+  }
   selects.forEach(sel => {
-    sel.addEventListener('change', () => {
-      const todosPreenchidos = Array.from(selects).every(e => e.value !== "");
-      botaoProximo1.disabled = !todosPreenchidos;
-    });
+    sel.addEventListener('change', verificaTodosPreenchidos);
   });
+  // Caso o usuário já tenha preenchido (ex: navega entre etapas)
+  verificaTodosPreenchidos();
+
   botaoProximo1.addEventListener('click', () => {
     etapaPesquisa.classList.remove('etapa-ativa');
     etapaPesquisa.classList.add('etapa-oculta');
@@ -69,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
       botoesSelecionar.forEach(b => b.classList.remove('selecionado'));
       e.target.classList.add('selecionado');
 
-      // Avança para etapa endereço
       etapaEscolha.classList.remove('etapa-ativa');
       etapaEscolha.classList.add('etapa-oculta');
       etapaEndereco.classList.remove('etapa-oculta');
