@@ -1,3 +1,10 @@
 node_modules/
 .env
 credentials.json
+certs/
+.env
+.env.*
+certs/
+*.p12
+*.pem
+*.key

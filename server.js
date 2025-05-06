@@ -2,6 +2,8 @@ const express = require('express');
 const path = require('path');
 const { google } = require('googleapis');
 const axios = require('axios');
+const fs = require('fs');
+const https = require('https');
 require('dotenv').config();
 
 const app = express();
@@ -79,6 +81,25 @@ app.post('/api/registrar', async (req, res) => {
 
 // =========== PAGAMENTO VIA PIX EFI/GERENCIANET =============
 
+// Carregue o certificado .p12 (PKCS#12) - USANDO VARIÁVEL DE AMBIENTE
+let p12;
+const certPath = process.env.CERT_PATH || './certs/certificado.p12';
+try {
+  p12 = fs.readFileSync(certPath);
+} catch (err) {
+  console.warn('[AVISO] Certificado Pix .p12 não encontrado. Recurso Pix ficará indisponível até corrigir isto.');
+}
+
+// Crie o httpsAgent usando o certificado .p12 (PKCS#12)
+let httpsAgent;
+if (p12) {
+  httpsAgent = new https.Agent({
+    pfx: p12,
+    passphrase: process.env.CERT_PASSWORD || '', // senha do .p12
+    rejectUnauthorized: true,
+  });
+}
+
 // Endpoint para gerar cobrança Pix (QR Code)
 app.post('/api/gerar-pix', async (req, res) => {
   const { frete } = req.body; // recebe do frontend: 'sedex' ou outro
@@ -100,22 +121,27 @@ app.post('/api/gerar-pix', async (req, res) => {
     return res.status(500).json({ erro: 'Credenciais Pix não configuradas corretamente.' });
   }
 
-  try {
-    // 1. Obter access token
-    const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
-const tokenResponse = await axios.post(
-  'https://api-pix-h.gerencianet.com.br/v1/authorize',
-  'grant_type=client_credentials',
-  {
-    headers: {
-      'Authorization': `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+  if (!httpsAgent) {
+    return res.status(500).json({ erro: 'Certificado Pix não configurado no servidor.' });
   }
-);
+
+  try {
+    // 1. Obter access token (endpoint de PRODUÇÃO)
+    const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+    const tokenResponse = await axios.post(
+      'https://api-pix.gerencianet.com.br/oauth/token',
+      { grant_type: 'client_credentials' },
+      {
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/json',
+        },
+        httpsAgent
+      }
+    );
     const accessToken = tokenResponse.data.access_token;
 
-    // 2. Criar cobrança Pix
+    // 2. Criar cobrança Pix (endpoint de PRODUÇÃO)
     const payload = {
       calendario: { expiracao: 3600 },
       valor: { original: valor },
@@ -123,29 +149,31 @@ const tokenResponse = await axios.post(
       solicitacaoPagador: descricao,
     };
 
-   const pixResponse = await axios.post(
-  'https://api-pix-h.gerencianet.com.br/v2/cob',
-  payload,
-  {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    }
-  }
-);
+    const pixResponse = await axios.post(
+      'https://api-pix.gerencianet.com.br/v2/cob',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        httpsAgent
+      }
+    );
 
-    // 3. Gerar o QR Code para a cobrança
+    // 3. Gerar o QR Code para a cobrança (endpoint de PRODUÇÃO)
     const locId = pixResponse.data.loc && pixResponse.data.loc.id;
     let qrcode = null, copiaecola = null;
     if (locId) {
       const qrResponse = await axios.get(
-  `https://api-pix-h.gerencianet.com.br/v2/loc/${locId}/qrcode`,
-  {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    }
-  }
-);
+        `https://api-pix.gerencianet.com.br/v2/loc/${locId}/qrcode`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          httpsAgent
+        }
+      );
       qrcode = qrResponse.data.imagemQrcode;
       copiaecola = qrResponse.data.qrcode;
     }
@@ -156,8 +184,14 @@ const tokenResponse = await axios.post(
     });
 
   } catch (error) {
-    console.error(error.response?.data || error);
-    res.status(500).json({ erro: 'Erro ao gerar cobrança Pix' });
+    // Só mostre detalhes completos em ambiente de desenvolvimento!
+    if (process.env.NODE_ENV === 'development') {
+      console.error(error.response?.data || error);
+      res.status(500).json({ erro: error.response?.data || error.message });
+    } else {
+      console.error(error.response?.data || error);
+      res.status(500).json({ erro: 'Erro ao gerar cobrança Pix' });
+    }
   }
 });
 
