@@ -37,15 +37,21 @@ main {
   padding: 10px 0 0 0;
   border-bottom: 2px solid #c8a165;
   text-align: center;
+  width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
 }
 .linha-do-tempo ul {
   display: flex;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 14px;
+  gap: 8px;
   list-style: none;
-  padding: 0;
-  margin: 0 auto;
-  width: fit-content;
+  padding: 8px 0;
+  margin: 0;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
 }
 .linha-do-tempo .etapa {
   padding: 6px 18px;
@@ -58,6 +64,11 @@ main {
   font-size: 1rem;
   opacity: 0.5;
   text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 90px;
+  max-width: 160px;
+  box-sizing: border-box;
 }
 .linha-do-tempo .etapa.atual {
   background-color: #c8a165;
@@ -301,6 +312,7 @@ main {
   gap: 11px;
   justify-content: center;
   margin-bottom: 18px;
+  flex-direction: column;
 }
 .pagamento-pix img {
   width: 38px;
@@ -354,42 +366,35 @@ footer a:hover {
     grid-template-columns: 1fr;
   }
 }
-/* Garante que a linha do tempo nunca ultrapasse a tela */
-.linha-do-tempo {
-  width: 100%;
-  overflow-x: auto;
-  box-sizing: border-box;
+@media (max-width: 500px) {
+  .pagamento-pix {
+    flex-direction: column !important;
+    gap: 10px;
+  }
 }
 
+/* Garante que a linha do tempo nunca ultrapasse a tela */
 .linha-do-tempo ul {
   display: flex;
-  flex-wrap: nowrap;     /* mantém os itens em linha */
-  gap: 8px;              /* espaçamento entre os botões */
+  flex-wrap: nowrap;
+  gap: 8px;
   padding: 8px 0;
   margin: 0;
   list-style: none;
-  width: max-content;    /* só ocupa o espaço necessário */
-  min-width: 100%;       /* sempre cobre toda a largura mínima */
+  width: max-content;
+  min-width: 100%;
   box-sizing: border-box;
 }
 
 .linha-do-tempo li,
 .linha-do-tempo .etapa-label {
   white-space: nowrap;
-  flex-shrink: 0;        /* impede que os botões encolham demais */
-  min-width: 90px;       /* largura mínima para cada botão/etapa */
-  max-width: 160px;      /* (opcional) para não ficar gigante em telas grandes */
+  flex-shrink: 0;
+  min-width: 90px;
+  max-width: 160px;
   box-sizing: border-box;
 }
 
-/* Opcional: esconde scrollbar visual mas mantém navegação lateral por swipe */
 .linha-do-tempo::-webkit-scrollbar {
   display: none;
-}
-
-.qrcode-img {
-  width: 220px;
-  height: 220px;
-  margin: 18px auto 0 auto;
-  display: block;
 }
