@@ -43,7 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ETAPA 1: Pesquisa
   const pesquisaForm = document.getElementById('pesquisa-form');
-  pesquisaForm.addEventListener('input', () => {
+  // CORRIGIDO: usar 'change' pois 'input' não dispara corretamente em <select>
+  pesquisaForm.addEventListener('change', () => {
     const todosPreenchidos = [...pesquisaForm.elements].filter(e => e.tagName === 'SELECT').every(e => e.value !== "");
     botaoProximo1.disabled = !todosPreenchidos;
   });
