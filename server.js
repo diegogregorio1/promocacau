@@ -2,7 +2,6 @@ const express = require('express');
 const path = require('path');
 const { google } = require('googleapis');
 const axios = require('axios');
-const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -78,33 +77,9 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
-// =========== PAGAMENTO VIA PIX PAGSEGURO =============
+// =========== PAGAMENTO VIA PAGSEGURO CHECKOUT PRO (PIX) =============
 
-// Função para obter o access_token do PagSeguro
-async function getPagseguroToken() {
-  const tokenUrl = 'https://oauth.api.pagseguro.com/oauth2/token';
-  const clientId = process.env.PAGSEGURO_CLIENT_ID;
-  const clientSecret = process.env.PAGSEGURO_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error('PAGSEGURO_CLIENT_ID ou PAGSEGURO_CLIENT_SECRET não configurados.');
-  }
-
-  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-  try {
-    const response = await axios.post(tokenUrl, 'grant_type=client_credentials', {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${auth}`
-      }
-    });
-    return response.data.access_token;
-  } catch (err) {
-    throw new Error('Erro ao obter access_token do PagSeguro. Detalhes: ' + (err.response?.data?.error_description || err.message));
-  }
-}
-
-// Endpoint para gerar cobrança Pix (PagSeguro)
+// Endpoint para gerar link de pagamento PagSeguro (Checkout Pro, com opção Pix)
 app.post('/api/gerar-pix', async (req, res) => {
   const { frete } = req.body; // recebe do frontend: 'sedex' ou outro
 
@@ -117,54 +92,46 @@ app.post('/api/gerar-pix', async (req, res) => {
     descricao = "Frete PAC";
   }
 
-  const PAGSEGURO_PIX_KEY = process.env.PAGSEGURO_PIX_KEY;
+  // Dados obrigatórios do PagSeguro Checkout Pro
+  const PAGSEGURO_EMAIL = process.env.PAGSEGURO_EMAIL;
+  const PAGSEGURO_TOKEN = process.env.PAGSEGURO_TOKEN;
 
-  if (!process.env.PAGSEGURO_CLIENT_ID || !process.env.PAGSEGURO_CLIENT_SECRET || !PAGSEGURO_PIX_KEY) {
-    return res.status(500).json({ erro: 'Credenciais PagSeguro não configuradas corretamente.' });
+  if (!PAGSEGURO_EMAIL || !PAGSEGURO_TOKEN) {
+    return res.status(500).json({ erro: 'Credenciais PagSeguro Checkout Pro não configuradas corretamente.' });
   }
 
   try {
-    // 1. Obter access token
-    const access_token = await getPagseguroToken();
-
-    // 2. Criar cobrança Pix
-    const payload = {
-      calendario: { expiracao: 3600 },
-      valor: { original: valor },
-      chave: PAGSEGURO_PIX_KEY,
-      solicitacaoPagador: descricao
-    };
-
-    const pixResponse = await axios.post(
-      'https://pix.api.pagseguro.com/pix/v2/cob',
-      payload,
+    // Cria a preferência de pagamento (Checkout Pro)
+    const response = await axios.post(
+      'https://ws.pagseguro.uol.com.br/v2/checkout',
+      new URLSearchParams({
+        email: PAGSEGURO_EMAIL,
+        token: PAGSEGURO_TOKEN,
+        currency: 'BRL',
+        itemId1: '1',
+        itemDescription1: descricao,
+        itemAmount1: valor,
+        itemQuantity1: '1'
+      }),
       {
         headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/x-www-form-urlencoded'
         }
       }
     );
 
-    // 3. Gerar o QR Code e copia e cola
-    const txid = pixResponse.data.txid;
-    const qrcodeResp = await axios.get(
-      `https://pix.api.pagseguro.com/pix/v2/cob/${txid}/qrcode`,
-      {
-        headers: {
-          'Authorization': `Bearer ${access_token}`
-        }
-      }
-    );
+    // O retorno é em XML! Vamos extrair o código do checkout para montar a URL de pagamento
+    const match = response.data.match(/<code>([^<]+)<\/code>/);
+    if (!match) throw new Error('Código de pagamento não encontrado na resposta PagSeguro.');
+    const checkoutCode = match[1];
+    const redirectURL = `https://pagseguro.uol.com.br/v2/checkout/payment.html?code=${checkoutCode}`;
 
-    res.json({
-      qrcode: qrcodeResp.data.imagemQrcode, // Base64 da imagem QRCode
-      copiaecola: qrcodeResp.data.qrcode    // Código Pix Copia e Cola
-    });
+    // Retorna a URL para o frontend redirecionar o usuário (onde ele pode escolher Pix)
+    res.json({ url_pagamento: redirectURL });
 
   } catch (error) {
-    console.error('[ERRO PagSeguro Pix]:', error.response?.data || error.message || error);
-    res.status(500).json({ erro: 'Erro ao gerar cobrança Pix PagSeguro', detalhes: error.response?.data || error.message || error });
+    console.error('[ERRO PagSeguro Checkout Pro]:', error.response?.data || error.message || error);
+    res.status(500).json({ erro: 'Erro ao criar cobrança PagSeguro Checkout Pro', detalhes: error.response?.data || error.message || error });
   }
 });
 
