@@ -81,6 +81,8 @@ app.post('/api/registrar', async (req, res) => {
 
 // Endpoint para gerar link de pagamento PagSeguro (Checkout Pro, com opção Pix)
 app.post('/api/gerar-pix', async (req, res) => {
+  console.log('[/api/gerar-pix] endpoint chamado', new Date().toISOString());
+
   const { frete } = req.body; // recebe do frontend: 'sedex' ou outro
 
   let valor, descricao;
@@ -96,12 +98,13 @@ app.post('/api/gerar-pix', async (req, res) => {
   const PAGSEGURO_EMAIL = process.env.PAGSEGURO_EMAIL;
   const PAGSEGURO_TOKEN = process.env.PAGSEGURO_TOKEN;
 
+  console.log('Preparando requisição PagSeguro:', { valor, descricao, PAGSEGURO_EMAIL, PAGSEGURO_TOKEN: PAGSEGURO_TOKEN ? 'ok' : 'faltando' });
+
   if (!PAGSEGURO_EMAIL || !PAGSEGURO_TOKEN) {
     return res.status(500).json({ erro: 'Credenciais PagSeguro Checkout Pro não configuradas corretamente.' });
   }
 
   try {
-    // Cria a preferência de pagamento (Checkout Pro)
     const response = await axios.post(
       'https://ws.pagseguro.uol.com.br/v2/checkout',
       new URLSearchParams({
@@ -120,6 +123,8 @@ app.post('/api/gerar-pix', async (req, res) => {
       }
     );
 
+    console.log('Resposta PagSeguro:', response.data);
+
     // O retorno é em XML! Vamos extrair o código do checkout para montar a URL de pagamento
     const match = response.data.match(/<code>([^<]+)<\/code>/);
     if (!match) throw new Error('Código de pagamento não encontrado na resposta PagSeguro.');
@@ -130,8 +135,18 @@ app.post('/api/gerar-pix', async (req, res) => {
     res.json({ url_pagamento: redirectURL });
 
   } catch (error) {
-    console.error('[ERRO PagSeguro Checkout Pro]:', error.response?.data || error.message || error);
-    res.status(500).json({ erro: 'Erro ao criar cobrança PagSeguro Checkout Pro', detalhes: error.response?.data || error.message || error });
+    console.error('[ERRO PagSeguro Checkout Pro]');
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Headers:', error.response.headers);
+      console.error('Data:', error.response.data);
+    } else {
+      console.error(error);
+    }
+    res.status(500).json({
+      erro: 'Erro ao criar cobrança PagSeguro Checkout Pro',
+      detalhes: error.response?.data || error.message || error
+    });
   }
 });
 
