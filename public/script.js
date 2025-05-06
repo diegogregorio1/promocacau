@@ -43,10 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ETAPA 1: Pesquisa
   const pesquisaForm = document.getElementById('pesquisa-form');
-  // CORRIGIDO: usar 'change' pois 'input' não dispara corretamente em <select>
-  pesquisaForm.addEventListener('change', () => {
-    const todosPreenchidos = [...pesquisaForm.elements].filter(e => e.tagName === 'SELECT').every(e => e.value !== "");
-    botaoProximo1.disabled = !todosPreenchidos;
+  const selects = pesquisaForm.querySelectorAll('select');
+  selects.forEach(sel => {
+    sel.addEventListener('change', () => {
+      const todosPreenchidos = Array.from(selects).every(e => e.value !== "");
+      botaoProximo1.disabled = !todosPreenchidos;
+    });
   });
   botaoProximo1.addEventListener('click', () => {
     etapaPesquisa.classList.remove('etapa-ativa');
