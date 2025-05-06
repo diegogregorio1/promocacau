@@ -41,6 +41,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ----------- RECONSTRÓI O CERTIFICADO A PARTIR DO BASE64 (Render) -----------
+const certsDir = path.join(__dirname, 'certs');
+const certPath = path.join(certsDir, 'certificado.p12');
+if (process.env.CERT_P12_BASE64) {
+  if (!fs.existsSync(certsDir)) {
+    fs.mkdirSync(certsDir, { recursive: true });
+  }
+  fs.writeFileSync(certPath, Buffer.from(process.env.CERT_P12_BASE64, 'base64'));
+  console.log('Certificado .p12 reconstruído com sucesso!');
+} else {
+  console.warn('[AVISO] CERT_P12_BASE64 não está definida! Recurso Pix ficará indisponível.');
+}
+// ----------------------------------------------------------------------------
+
 // Rota de cadastro (planilha Google)
 app.post('/api/registrar', async (req, res) => {
   const { nome, cpf, email, cellphone } = req.body;
@@ -81,9 +95,8 @@ app.post('/api/registrar', async (req, res) => {
 
 // =========== PAGAMENTO VIA PIX EFI/GERENCIANET =============
 
-// Carregue o certificado .p12 (PKCS#12) - USANDO VARIÁVEL DE AMBIENTE
+// Carregue o certificado reconstruído
 let p12;
-const certPath = process.env.CERT_PATH || './certs/certificado.p12';
 try {
   p12 = fs.readFileSync(certPath);
 } catch (err) {
