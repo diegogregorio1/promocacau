@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
   pixResultDiv.style.marginTop = '16px';
   pixResultDiv.innerHTML = `
     <div id="pixQRCodeArea" style="text-align: center; margin-bottom: 10px;">
-      <img id="pixQRCodeImg" src="" alt="QR Code Pix" style="max-width: 260px;display:block;margin:0 auto 10px;">
+      <img id="pixQRCodeImg" class="qrcode-img" src="" alt="QR Code Pix">
     </div>
     <div id="pixCopiaColaArea" style="margin-bottom:10px;">
       <strong>Copia e Cola:</strong>
