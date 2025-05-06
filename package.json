@@ -1,7 +1,7 @@
 {
   "name": "promocaocacaushow",
   "version": "1.0.0",
-  "description": "Promoção Cacau Show - Backend com Express, integração Google Sheets e pagamento Pix via Gerencianet/EFI",
+  "description": "Promoção Cacau Show - Backend com Express, integração Google Sheets e pagamento Pix via PagSeguro",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -10,11 +10,7 @@
     "axios": "^1.9.0",
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
-    "fs": "^0.0.1-security",
-    "googleapi": "^1.0.2",
-    "googleapis": "^133.0.0",
-    "https": "^1.0.0",
-    "node-fetch": "^2.6.7"
+    "googleapis": "^133.0.0"
   },
   "engines": {
     "node": "20.x"
