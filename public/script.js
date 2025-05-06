@@ -334,44 +334,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // =============== PAGAMENTO PIX INTEGRAÇÃO ===============
-  // Cria dinamicamente o bloco para exibir Pix (QR Code e copia e cola)
-  const pagamentoArea = document.querySelector('.pagamento-area .pagamento-pix');
-  let pixResultDiv = document.createElement('div');
-  pixResultDiv.id = 'pixResult';
-  pixResultDiv.style.display = 'none';
-  pixResultDiv.style.marginTop = '16px';
-  pixResultDiv.innerHTML = `
-    <div id="pixQRCodeArea" style="text-align: center; margin-bottom: 10px;">
-      <img id="pixQRCodeImg" class="qrcode-img" src="" alt="QR Code Pix">
-    </div>
-    <div id="pixCopiaColaArea" style="margin-bottom:10px;">
-      <strong>Copia e Cola:</strong>
-      <span id="pixCopiaCola" style="word-break: break-all; font-size:1.1em;"></span>
-      <button type="button" id="botaoCopiarPix" style="margin-left: 6px;">Copiar código</button>
-    </div>
-    <div id="pixAviso" style="color: #43a047; font-size: 1em;"></div>
-  `;
-  pagamentoArea.appendChild(pixResultDiv);
-
+  // =============== PAGAMENTO PIX INTEGRAÇÃO - CHECKOUT PRO ===============
   if (botaoPagarPix) {
     botaoPagarPix.addEventListener('click', async () => {
       const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
-      let tipoFrete = freteSelecionado ? freteSelecionado.value.toLowerCase() : null; // 'pac' ou 'sedex'
+      let tipoFrete = freteSelecionado ? freteSelecionado.value.toLowerCase() : null;
       if (!tipoFrete) {
         alert('Selecione o tipo de frete para gerar o pagamento.');
         return;
       }
 
       botaoPagarPix.disabled = true;
-      botaoPagarPix.textContent = "Gerando QR Code...";
-
-      // Oculta resultado anterior se existir
-      pixResultDiv.style.display = 'none';
-      document.getElementById('pixAviso').textContent = '';
+      botaoPagarPix.textContent = "Redirecionando...";
 
       try {
-        // Chama o endpoint Pix do backend!
         const resposta = await fetch('/api/gerar-pix', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -379,39 +355,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const data = await resposta.json();
 
-        if (data.qrcode || data.copiaecola) {
-          // Exibe resultado Pix
-          if (data.qrcode) {
-            document.getElementById('pixQRCodeImg').src = data.qrcode;
-            document.getElementById('pixQRCodeImg').style.display = '';
-          } else {
-            document.getElementById('pixQRCodeImg').style.display = 'none';
-          }
-          document.getElementById('pixCopiaCola').textContent = data.copiaecola || '';
-          pixResultDiv.style.display = 'block';
-          document.getElementById('pixAviso').textContent = "Escaneie ou copie o código para pagar. Após o pagamento, a equipe confirmará seu pedido!";
+        if (data.url_pagamento) {
+          window.location.href = data.url_pagamento;
         } else {
-          alert('Não foi possível gerar o QR Code Pix. Tente novamente.');
+          alert('Não foi possível gerar o link de pagamento. Tente novamente.');
         }
       } catch (erro) {
-        alert('Erro ao gerar o pagamento Pix. Tente novamente.');
+        alert('Erro ao gerar o link de pagamento. Tente novamente.');
       }
 
       botaoPagarPix.disabled = false;
       botaoPagarPix.textContent = "Pagar com PIX";
     });
   }
-
-  // Evento para copiar código Pix ao clicar no botão
-  pagamentoArea.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'botaoCopiarPix') {
-      const codigo = document.getElementById('pixCopiaCola').textContent;
-      if (codigo) {
-        navigator.clipboard.writeText(codigo);
-        document.getElementById('pixAviso').textContent = "Código Pix copiado para a área de transferência!";
-      }
-    }
-  });
-
-  // =============== FIM PAGAMENTO PIX INTEGRAÇÃO ===============
+  // =============== FIM PAGAMENTO PIX INTEGRAÇÃO - CHECKOUT PRO ===============
 });
