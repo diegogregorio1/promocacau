@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // ETAPA 1: Pesquisa
   const pesquisaForm = document.getElementById('pesquisa-form');
   const selects = pesquisaForm.querySelectorAll('select');
-  // Ativa o botão no carregamento (caso o usuário volte no histórico e as respostas estejam preenchidas)
   function verificaTodosPreenchidos() {
     const todosPreenchidos = Array.from(selects).every(e => e.value !== "");
     botaoProximo1.disabled = !todosPreenchidos;
@@ -52,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
   selects.forEach(sel => {
     sel.addEventListener('change', verificaTodosPreenchidos);
   });
-  // Caso o usuário já tenha preenchido (ex: navega entre etapas)
   verificaTodosPreenchidos();
 
   botaoProximo1.addEventListener('click', () => {
@@ -274,6 +272,10 @@ document.addEventListener('DOMContentLoaded', () => {
     valorFrete: ""
   };
 
+  // Variáveis para controle de pagamento
+  let paymentId = null;
+  let pollingTimer = null;
+
   if (botaoAvancarFrete) {
     botaoAvancarFrete.addEventListener('click', () => {
       // Produto
@@ -371,7 +373,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const data = await resposta.json();
 
-        if (data.qrCodeImage && data.copiaECola) {
+        if (data.qrCodeImage && data.copiaECola && data.paymentId) {
+          paymentId = data.paymentId;
           // Exibe o QR Code e o Copia e Cola na tela de confirmação
           let resultadoDiv = document.getElementById('resultadoPix');
           if (!resultadoDiv) {
@@ -387,7 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
               <input id="pixCopiaCola" type="text" value="${data.copiaECola}" readonly style="width: 100%;font-size:14px;" />
               <button id="copiarPix" style="margin-top:6px;">Copiar código PIX</button>
             </div>
-            <p style="color: #27ae60; font-weight:bold;">Após o pagamento, aguarde a confirmação na tela.</p>
+            <p style="color: #27ae60; font-weight:bold;">Após o pagamento, aguarde a confirmação automática nesta tela.</p>
+            <div id="statusPix" style="margin:10px 0;color:#333;font-weight:bold;"></div>
           `;
           // Função para copiar o código PIX
           document.getElementById('copiarPix').onclick = () => {
@@ -397,8 +401,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.execCommand('copy');
             alert('Código PIX copiado!');
           };
-          // Rola até o QR Code
           resultadoDiv.scrollIntoView({ behavior: 'smooth' });
+
+          // Inicia o polling do status do pagamento
+          iniciarPollingPagamento(paymentId);
         } else {
           alert('Não foi possível gerar o QR Code PIX. Tente novamente.');
         }
@@ -409,6 +415,42 @@ document.addEventListener('DOMContentLoaded', () => {
       botaoPagarPix.disabled = false;
       botaoPagarPix.textContent = "Gerar PIX";
     });
+  }
+
+  // Função de polling para checar status do pagamento
+  function iniciarPollingPagamento(paymentId) {
+    const statusDiv = document.getElementById('statusPix');
+    function checarStatus() {
+      fetch(`/api/status-pagamento?paymentId=${paymentId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "RECEIVED" || data.status === "CONFIRMED") {
+            statusDiv.innerHTML = '<span style="color:#388e3c;">Pagamento confirmado! Parabéns, seu brinde será enviado para o endereço cadastrado.</span>';
+            // Avança para a etapa de sucesso após 3s
+            setTimeout(() => {
+              etapaConfirmacao.classList.remove('etapa-ativa');
+              etapaConfirmacao.classList.add('etapa-oculta');
+              etapaSucesso.classList.remove('etapa-oculta');
+              etapaSucesso.classList.add('etapa-ativa');
+              window.scrollTo({top: 0, behavior:'smooth'});
+            }, 3000);
+            if (pollingTimer) clearTimeout(pollingTimer);
+          } else if (data.status === "PENDING") {
+            statusDiv.innerHTML = '<span style="color:#ff9800;">Aguardando pagamento...</span>';
+            pollingTimer = setTimeout(checarStatus, 5000);
+          } else if (data.status === "OVERDUE") {
+            statusDiv.innerHTML = '<span style="color:#c0392b;">Pagamento vencido. Por favor, gere um novo PIX!</span>';
+          } else {
+            statusDiv.innerHTML = `<span style="color:#c0392b;">Status do pagamento: ${data.status || "desconhecido"}</span>`;
+            pollingTimer = setTimeout(checarStatus, 5000);
+          }
+        })
+        .catch(() => {
+          statusDiv.innerHTML = '<span style="color:#c0392b;">Erro ao checar status do pagamento. Tentando novamente...</span>';
+          pollingTimer = setTimeout(checarStatus, 10000);
+        });
+    }
+    checarStatus();
   }
   // =============== FIM PAGAMENTO - PIX ASAAS ===============
 });
