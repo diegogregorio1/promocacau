@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
         freteSelecionado.value : "";
 
       let valorFrete = freteSelecionado ?
-        (freteSelecionado.value === "PAC" ? "R$ 17,99" : "R$ 29,99") : "";
+        (freteSelecionado.value === "pac" ? "R$ 17,99" : "R$ 29,99") : "";
 
       dadosResumo = {
         produto: prodNome,
