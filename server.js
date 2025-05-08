@@ -98,7 +98,7 @@ async function criarClienteAsaas({ nome, email, cpf, celular }) {
   return response.data.id;
 }
 
-// Função para criar cobrança PIX no Asaas e retornar QRCODE e Copia e Cola
+// Função para criar cobrança PIX no Asaas e retornar QRCODE e Copia e Cola + ID do pagamento
 async function criarCobrancaPixAsaas({ clienteId, valor, descricao }) {
   const hoje = new Date().toISOString().slice(0, 10);
   // Cria cobrança PIX
@@ -128,12 +128,13 @@ async function criarCobrancaPixAsaas({ clienteId, valor, descricao }) {
     }
   );
   return {
+    paymentId,
     qrCodeImage: qrRes.data.encodedImage,
     copiaECola: qrRes.data.payload
   };
 }
 
-// Endpoint para gerar dados PIX Asaas (QR Code + Copia e Cola)
+// Endpoint para gerar dados PIX Asaas (QR Code + Copia e Cola + paymentId)
 app.post('/api/gerar-pagamento', async (req, res) => {
   console.log('[/api/gerar-pagamento] endpoint chamado', new Date().toISOString());
 
@@ -159,10 +160,11 @@ app.post('/api/gerar-pagamento', async (req, res) => {
     // 1. Crie (ou utilize) cliente no Asaas
     const clienteId = await criarClienteAsaas({ nome, email, cpf, celular: cellphone });
 
-    // 2. Crie cobrança PIX e obtenha QR Code e Copia e Cola
+    // 2. Crie cobrança PIX e obtenha QR Code, Copia e Cola, e paymentId
     const pixInfo = await criarCobrancaPixAsaas({ clienteId, valor, descricao });
 
     res.json({
+      paymentId: pixInfo.paymentId,
       qrCodeImage: pixInfo.qrCodeImage,
       copiaECola: pixInfo.copiaECola
     });
@@ -170,6 +172,32 @@ app.post('/api/gerar-pagamento', async (req, res) => {
     console.error('[ERRO Asaas API]', error?.response?.data || error);
     res.status(500).json({
       erro: 'Erro ao criar cobrança PIX Asaas',
+      detalhes: error?.response?.data || error.message || error,
+    });
+  }
+});
+
+// Endpoint para checar status do pagamento PIX Asaas
+app.get('/api/status-pagamento', async (req, res) => {
+  const paymentId = req.query.paymentId;
+  if (!paymentId) {
+    return res.status(400).json({ erro: 'Informe um paymentId para consulta.' });
+  }
+  try {
+    const response = await axios.get(
+      `https://www.asaas.com/api/v3/payments/${paymentId}`,
+      {
+        headers: {
+          access_token: process.env.ASAAS_API_KEY
+        }
+      }
+    );
+    // Os status possíveis: PENDING, RECEIVED, CONFIRMED, OVERDUE, etc.
+    res.json({ status: response.data.status });
+  } catch (error) {
+    console.error('[ERRO consulta pagamento Asaas]', error?.response?.data || error);
+    res.status(500).json({
+      erro: 'Erro ao consultar status do pagamento PIX Asaas',
       detalhes: error?.response?.data || error.message || error,
     });
   }
