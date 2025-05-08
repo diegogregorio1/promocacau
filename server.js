@@ -1,24 +1,14 @@
 const express = require('express');
 const path = require('path');
 const { google } = require('googleapis');
+const axios = require('axios');
 require('dotenv').config();
-
-// Mercado Pago SDK v3 (novo formato)
-const { MercadoPagoConfig, Preference } = require('mercadopago');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
 
-// Configuração do Mercado Pago
-if (!process.env.MP_ACCESS_TOKEN) {
-  console.error('ERRO: O Access Token do Mercado Pago não está configurado. Verifique o arquivo .env.');
-  process.exit(1);
-}
-const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
-console.log('Access Token do Mercado Pago configurado com sucesso.');
-
-// Função para validar CPF (dígito verificador)
+// Função para validar CPF
 function validarCPF(cpf) {
   cpf = cpf.replace(/[^\d]+/g, '');
   if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
@@ -89,11 +79,52 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
-// Endpoint para gerar link de pagamento Mercado Pago (Checkout Pro)
+// Função para criar cliente no Asaas
+async function criarClienteAsaas({ nome, email, cpf, celular }) {
+  const response = await axios.post(
+    'https://www.asaas.com/api/v3/customers',
+    {
+      name: nome,
+      email: email,
+      cpfCnpj: cpf,
+      mobilePhone: celular
+    },
+    {
+      headers: {
+        access_token: process.env.ASAAS_API_KEY
+      }
+    }
+  );
+  return response.data.id;
+}
+
+// Função para criar cobrança no Asaas e retornar link de pagamento
+async function criarCobrancaAsaas({ clienteId, valor, descricao }) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const response = await axios.post(
+    'https://www.asaas.com/api/v3/payments',
+    {
+      customer: clienteId,
+      billingType: 'UNDEFINED', // mostra todas as formas (boleto, pix, cartão)
+      value: valor,
+      description: descricao,
+      dueDate: hoje // vencimento hoje
+    },
+    {
+      headers: {
+        access_token: process.env.ASAAS_API_KEY
+      }
+    }
+  );
+  return response.data.invoiceUrl;
+}
+
+// Endpoint para gerar link de pagamento Asaas (substitui Mercado Pago)
 app.post('/api/gerar-pagamento', async (req, res) => {
   console.log('[/api/gerar-pagamento] endpoint chamado', new Date().toISOString());
 
-  const { frete } = req.body;
+  // Receba também dados do cliente
+  const { frete, nome, email, cpf, cellphone } = req.body;
 
   let valor, descricao;
   if (frete === 'sedex') {
@@ -106,49 +137,28 @@ app.post('/api/gerar-pagamento', async (req, res) => {
     return res.status(400).json({ erro: 'Tipo de frete inválido.' });
   }
 
-  console.log('[/api/gerar-pagamento] Dados de pagamento:', { descricao, valor });
+  if (!nome || !email || !cpf || !cellphone) {
+    return res.status(400).json({ erro: 'Dados do cliente incompletos.' });
+  }
 
   try {
-    const preference = new Preference(mpClient);
-    const response = await preference.create({
-      body: {
-        items: [
-          {
-            title: descricao,
-            quantity: 1,
-            unit_price: parseFloat(valor)
-          }
-        ],
-        payment_methods: {
-          excluded_payment_types: [
-            { id: 'ticket' } // Exclui boleto bancário
-          ],
-          installments: 1 // Limita a 1 parcela
-        },
-        back_urls: {
-          success: `${process.env.BASE_URL}/sucesso`,
-          failure: `${process.env.BASE_URL}/falha`,
-          pending: `${process.env.BASE_URL}/pendente`
-        },
-        auto_return: 'approved'
-      }
-    });
+    // 1. Crie (ou utilize) cliente no Asaas
+    const clienteId = await criarClienteAsaas({ nome, email, cpf, celular: cellphone });
 
-    console.log('Preferência criada com sucesso:', response);
-    res.json({ url_pagamento: response.init_point });
+    // 2. Crie cobrança e obtenha URL
+    const urlPagamento = await criarCobrancaAsaas({ clienteId, valor, descricao });
+
+    res.json({ url_pagamento: urlPagamento });
   } catch (error) {
-    console.error('[ERRO Mercado Pago Checkout Pro]', {
-      mensagem: error.message,
-      detalhes: error.response ? error.response.data : null,
-    });
+    console.error('[ERRO Asaas API]', error?.response?.data || error);
     res.status(500).json({
-      erro: 'Erro ao criar cobrança Mercado Pago',
-      detalhes: error.message || error,
+      erro: 'Erro ao criar cobrança Asaas',
+      detalhes: error?.response?.data || error.message || error,
     });
   }
 });
 
-// Rotas de retorno para o Mercado Pago direcionando para as páginas corretas
+// Rotas de retorno para as páginas corretas
 app.get('/sucesso', (req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'confirmacao.html'))
 );
