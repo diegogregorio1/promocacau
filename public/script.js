@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // =============== PAGAMENTO PIX INTEGRAÇÃO - CHECKOUT PRO ===============
+  // =============== PAGAMENTO - CHECKOUT PRO MERCADO PAGO ===============
   if (botaoPagarPix) {
     botaoPagarPix.addEventListener('click', async () => {
       const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
@@ -355,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
       botaoPagarPix.textContent = "Redirecionando...";
 
       try {
-        const resposta = await fetch('/api/gerar-pix', {
+        const resposta = await fetch('/api/gerar-pagamento', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ frete: tipoFrete })
@@ -372,8 +372,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       botaoPagarPix.disabled = false;
-      botaoPagarPix.textContent = "Pagar com PIX";
+      botaoPagarPix.textContent = "Pagar com Mercado Pago";
     });
   }
-  // =============== FIM PAGAMENTO PIX INTEGRAÇÃO - CHECKOUT PRO ===============
+  // =============== FIM PAGAMENTO - CHECKOUT PRO MERCADO PAGO ===============
 });
