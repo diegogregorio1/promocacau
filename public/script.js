@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // =============== PAGAMENTO - CHECKOUT PRO MERCADO PAGO ===============
+  // =============== PAGAMENTO - CHECKOUT PRO ASAAS ===============
   if (botaoPagarPix) {
     botaoPagarPix.addEventListener('click', async () => {
       const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
@@ -351,6 +351,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      // Pegue os dados do cliente dos inputs
+      const nome = document.getElementById('nome').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
+      let cellphone = document.getElementById('cellphone').value.replace(/\D/g, '');
+      if (cellphone.length === 11 && !cellphone.startsWith('+55')) {
+        cellphone = '+55' + cellphone;
+      }
+
       botaoPagarPix.disabled = true;
       botaoPagarPix.textContent = "Redirecionando...";
 
@@ -358,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resposta = await fetch('/api/gerar-pagamento', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ frete: tipoFrete })
+          body: JSON.stringify({ frete: tipoFrete, nome, email, cpf, cellphone })
         });
         const data = await resposta.json();
 
@@ -372,8 +381,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       botaoPagarPix.disabled = false;
-      botaoPagarPix.textContent = "Pagar com Mercado Pago";
+      botaoPagarPix.textContent = "Pagar";
     });
   }
-  // =============== FIM PAGAMENTO - CHECKOUT PRO MERCADO PAGO ===============
+  // =============== FIM PAGAMENTO - CHECKOUT PRO ASAAS ===============
 });
