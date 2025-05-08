@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pague com PIX | Cacau Show Promo</title>
+  <title>Pagamento Confirmado | Cacau Show Promo</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -13,11 +13,13 @@
   </header>
 
   <main>
-    <section id="etapa-confirmacao" class="etapa-ativa">
+    <section id="etapa-sucesso" class="etapa-ativa">
       <div class="card-padrao">
-        <h1 style="color:#43a047;">Finalize seu pagamento</h1>
-        <p style="font-size:1.20em;margin-bottom:10px;">Para garantir seu brinde, pague via PIX usando o QR Code ou o código Copia e Cola abaixo.</p>
-        <div id="resultadoPix" style="margin:28px 0;"></div>
+        <h1 style="color:#43a047;">🎉 Pagamento confirmado!</h1>
+        <img src="https://cdn-icons-png.flaticon.com/512/190/190411.png" alt="Sucesso" style="width:70px;margin:22px auto 15px auto;display:block;">
+        <p style="font-size:1.20em;margin-bottom:8px;">Seu brinde está garantido e será enviado para o endereço cadastrado.</p>
+        <p style="font-size:1.15em;">Você receberá um e-mail com o código de rastreio assim que seu chocolate for despachado.</p>
+        <p style="font-size:1.10em;margin-top:14px;">Obrigado por participar da promoção Cacau Show! 🍫</p>
         <button onclick="window.location.href='index.html'" class="botao-principal" style="margin-top:26px;">Voltar para a página inicial</button>
       </div>
     </section>
@@ -30,58 +32,5 @@
       <a href="politica-de-privacidade.html">Política de Privacidade</a>
     </p>
   </footer>
-  <script>
-    // Busca as informações PIX no backend ao carregar a página de confirmação
-    // (Ajuste para buscar dados do sessionStorage/localStorage ou query params se necessário)
-
-    // Exemplo: busca dados de sessionStorage (ajuste conforme seu fluxo)
-    document.addEventListener('DOMContentLoaded', async () => {
-      // Você pode transferir as informações do cliente e frete usando sessionStorage/localStorage ou query params
-      // Aqui está um exemplo usando sessionStorage:
-      const nome = sessionStorage.getItem('nome');
-      const email = sessionStorage.getItem('email');
-      const cpf = sessionStorage.getItem('cpf');
-      const cellphone = sessionStorage.getItem('cellphone');
-      const frete = sessionStorage.getItem('frete');
-
-      if (!nome || !email || !cpf || !cellphone || !frete) {
-        document.getElementById('resultadoPix').innerHTML = '<p style="color:#c0392b;">Não foi possível obter os dados do pagamento.<br>Por favor, retorne e tente novamente.</p>';
-        return;
-      }
-
-      try {
-        document.getElementById('resultadoPix').innerHTML = '<p>Gerando cobrança PIX...</p>';
-        const resposta = await fetch('/api/gerar-pagamento', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome, email, cpf, cellphone, frete })
-        });
-        const data = await resposta.json();
-        if (data.qrCodeImage && data.copiaECola) {
-          document.getElementById('resultadoPix').innerHTML = `
-            <h3>Pague com PIX</h3>
-            <img src="data:image/png;base64,${data.qrCodeImage}" alt="QR Code PIX" style="width:220px;height:220px;display:block;margin:0 auto 10px auto;">
-            <div style="margin: 10px 0;">
-              <label for="pixCopiaCola"><strong>Copia e Cola:</strong></label>
-              <input id="pixCopiaCola" type="text" value="${data.copiaECola}" readonly style="width: 100%;font-size:14px;" />
-              <button id="copiarPix" style="margin-top:6px;">Copiar código PIX</button>
-            </div>
-            <p style="color: #27ae60; font-weight:bold;">Após o pagamento, aguarde a confirmação.</p>
-          `;
-          document.getElementById('copiarPix').onclick = () => {
-            const input = document.getElementById('pixCopiaCola');
-            input.select();
-            input.setSelectionRange(0, 99999);
-            document.execCommand('copy');
-            alert('Código PIX copiado!');
-          };
-        } else {
-          document.getElementById('resultadoPix').innerHTML = '<p style="color:#c0392b;">Não foi possível gerar o QR Code PIX.<br>Tente novamente.</p>';
-        }
-      } catch (erro) {
-        document.getElementById('resultadoPix').innerHTML = '<p style="color:#c0392b;">Erro ao gerar o QR Code PIX.<br>Tente novamente.</p>';
-      }
-    });
-  </script>
 </body>
 </html>
