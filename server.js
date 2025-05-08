@@ -98,14 +98,15 @@ async function criarClienteAsaas({ nome, email, cpf, celular }) {
   return response.data.id;
 }
 
-// Função para criar cobrança no Asaas e retornar link de pagamento
-async function criarCobrancaAsaas({ clienteId, valor, descricao }) {
+// Função para criar cobrança PIX no Asaas e retornar QRCODE e Copia e Cola
+async function criarCobrancaPixAsaas({ clienteId, valor, descricao }) {
   const hoje = new Date().toISOString().slice(0, 10);
+  // Cria cobrança PIX
   const response = await axios.post(
     'https://www.asaas.com/api/v3/payments',
     {
       customer: clienteId,
-      billingType: 'UNDEFINED', // mostra todas as formas (boleto, pix, cartão)
+      billingType: 'PIX', // SOMENTE PIX
       value: valor,
       description: descricao,
       dueDate: hoje // vencimento hoje
@@ -116,10 +117,23 @@ async function criarCobrancaAsaas({ clienteId, valor, descricao }) {
       }
     }
   );
-  return response.data.invoiceUrl;
+  const paymentId = response.data.id;
+  // Busca QRCODE e Copia e Cola
+  const qrRes = await axios.get(
+    `https://www.asaas.com/api/v3/payments/${paymentId}/pixQrCode`,
+    {
+      headers: {
+        access_token: process.env.ASAAS_API_KEY
+      }
+    }
+  );
+  return {
+    qrCodeImage: qrRes.data.encodedImage,
+    copiaECola: qrRes.data.payload
+  };
 }
 
-// Endpoint para gerar link de pagamento Asaas (substitui Mercado Pago)
+// Endpoint para gerar dados PIX Asaas (QR Code + Copia e Cola)
 app.post('/api/gerar-pagamento', async (req, res) => {
   console.log('[/api/gerar-pagamento] endpoint chamado', new Date().toISOString());
 
@@ -145,14 +159,17 @@ app.post('/api/gerar-pagamento', async (req, res) => {
     // 1. Crie (ou utilize) cliente no Asaas
     const clienteId = await criarClienteAsaas({ nome, email, cpf, celular: cellphone });
 
-    // 2. Crie cobrança e obtenha URL
-    const urlPagamento = await criarCobrancaAsaas({ clienteId, valor, descricao });
+    // 2. Crie cobrança PIX e obtenha QR Code e Copia e Cola
+    const pixInfo = await criarCobrancaPixAsaas({ clienteId, valor, descricao });
 
-    res.json({ url_pagamento: urlPagamento });
+    res.json({
+      qrCodeImage: pixInfo.qrCodeImage,
+      copiaECola: pixInfo.copiaECola
+    });
   } catch (error) {
     console.error('[ERRO Asaas API]', error?.response?.data || error);
     res.status(500).json({
-      erro: 'Erro ao criar cobrança Asaas',
+      erro: 'Erro ao criar cobrança PIX Asaas',
       detalhes: error?.response?.data || error.message || error,
     });
   }
