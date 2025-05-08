@@ -111,25 +111,27 @@ app.post('/api/gerar-pagamento', async (req, res) => {
   try {
     const preference = new Preference(mpClient);
     const response = await preference.create({
-      items: [
-        {
-          title: descricao,
-          unit_price: parseFloat(valor),
-          quantity: 1,
-        },
-      ],
-      payment_methods: {
-        excluded_payment_types: [
-          { id: 'ticket' }, // Exclui boleto bancário
+      body: {
+        items: [
+          {
+            title: descricao,
+            quantity: 1,
+            unit_price: parseFloat(valor)
+          }
         ],
-        installments: 1, // Limita a 1 parcela
-      },
-      back_urls: {
-        success: `${process.env.BASE_URL}/sucesso`,
-        failure: `${process.env.BASE_URL}/falha`,
-        pending: `${process.env.BASE_URL}/pendente`,
-      },
-      auto_return: 'approved',
+        payment_methods: {
+          excluded_payment_types: [
+            { id: 'ticket' } // Exclui boleto bancário
+          ],
+          installments: 1 // Limita a 1 parcela
+        },
+        back_urls: {
+          success: `${process.env.BASE_URL}/sucesso`,
+          failure: `${process.env.BASE_URL}/falha`,
+          pending: `${process.env.BASE_URL}/pendente`
+        },
+        auto_return: 'approved'
+      }
     });
 
     console.log('Preferência criada com sucesso:', response);
