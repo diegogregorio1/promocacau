@@ -1,12 +1,13 @@
 const express = require('express');
 const path = require('path');
 const { google } = require('googleapis');
-const mercadopago = require('mercadopago');
 require('dotenv').config();
+
+// Mercado Pago SDK v3 (novo formato)
+const { MercadoPagoConfig, Preference } = require('mercadopago');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
 
 // Configuração do Mercado Pago
@@ -14,9 +15,7 @@ if (!process.env.MP_ACCESS_TOKEN) {
   console.error('ERRO: O Access Token do Mercado Pago não está configurado. Verifique o arquivo .env.');
   process.exit(1);
 }
-mercadopago.configure({
-  access_token: process.env.MP_ACCESS_TOKEN
-});
+const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 console.log('Access Token do Mercado Pago configurado com sucesso.');
 
 // Função para validar CPF (dígito verificador)
@@ -110,7 +109,8 @@ app.post('/api/gerar-pagamento', async (req, res) => {
   console.log('[/api/gerar-pagamento] Dados de pagamento:', { descricao, valor });
 
   try {
-    const preference = {
+    const preference = new Preference(mpClient);
+    const response = await preference.create({
       items: [
         {
           title: descricao,
@@ -130,12 +130,10 @@ app.post('/api/gerar-pagamento', async (req, res) => {
         pending: `${process.env.BASE_URL}/pendente`,
       },
       auto_return: 'approved',
-    };
+    });
 
-    const response = await mercadopago.preferences.create(preference);
-    console.log('Preferência criada com sucesso:', response.body);
-
-    res.json({ url_pagamento: response.body.init_point });
+    console.log('Preferência criada com sucesso:', response);
+    res.json({ url_pagamento: response.init_point });
   } catch (error) {
     console.error('[ERRO Mercado Pago Checkout Pro]', {
       mensagem: error.message,
