@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // =============== PAGAMENTO - CHECKOUT PRO ASAAS ===============
+  // =============== PAGAMENTO - PIX ASAAS (QR CODE E COPIA E COLA) ===============
   if (botaoPagarPix) {
     botaoPagarPix.addEventListener('click', async () => {
       const freteSelecionado = document.querySelector('input[name="tipo-frete"]:checked');
@@ -361,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       botaoPagarPix.disabled = true;
-      botaoPagarPix.textContent = "Redirecionando...";
+      botaoPagarPix.textContent = "Gerando PIX...";
 
       try {
         const resposta = await fetch('/api/gerar-pagamento', {
@@ -371,18 +371,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const data = await resposta.json();
 
-        if (data.url_pagamento) {
-          window.location.href = data.url_pagamento;
+        if (data.qrCodeImage && data.copiaECola) {
+          // Exibe o QR Code e o Copia e Cola na tela de confirmação
+          let resultadoDiv = document.getElementById('resultadoPix');
+          if (!resultadoDiv) {
+            resultadoDiv = document.createElement('div');
+            resultadoDiv.id = 'resultadoPix';
+            etapaConfirmacao.appendChild(resultadoDiv);
+          }
+          resultadoDiv.innerHTML = `
+            <h3>Pague com PIX</h3>
+            <img src="data:image/png;base64,${data.qrCodeImage}" alt="QR Code PIX" style="width:220px;height:220px;display:block;margin:0 auto 10px auto;">
+            <div style="margin: 10px 0;">
+              <label for="pixCopiaCola"><strong>Copia e Cola:</strong></label>
+              <input id="pixCopiaCola" type="text" value="${data.copiaECola}" readonly style="width: 100%;font-size:14px;" />
+              <button id="copiarPix" style="margin-top:6px;">Copiar código PIX</button>
+            </div>
+            <p style="color: #27ae60; font-weight:bold;">Após o pagamento, aguarde a confirmação na tela.</p>
+          `;
+          // Função para copiar o código PIX
+          document.getElementById('copiarPix').onclick = () => {
+            const input = document.getElementById('pixCopiaCola');
+            input.select();
+            input.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+            alert('Código PIX copiado!');
+          };
+          // Rola até o QR Code
+          resultadoDiv.scrollIntoView({ behavior: 'smooth' });
         } else {
-          alert('Não foi possível gerar o link de pagamento. Tente novamente.');
+          alert('Não foi possível gerar o QR Code PIX. Tente novamente.');
         }
       } catch (erro) {
-        alert('Erro ao gerar o link de pagamento. Tente novamente.');
+        alert('Erro ao gerar o QR Code PIX. Tente novamente.');
       }
 
       botaoPagarPix.disabled = false;
-      botaoPagarPix.textContent = "Pagar";
+      botaoPagarPix.textContent = "Gerar PIX";
     });
   }
-  // =============== FIM PAGAMENTO - CHECKOUT PRO ASAAS ===============
+  // =============== FIM PAGAMENTO - PIX ASAAS ===============
 });
