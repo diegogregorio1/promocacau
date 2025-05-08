@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { google } = require('googleapis');
-const axios = require('axios');
+const mercadopago = require('mercadopago');
 require('dotenv').config();
 
 const app = express();
@@ -9,39 +9,52 @@ const PORT = process.env.PORT || 3000;
 
 const SPREADSHEET_ID = '1ID-ix9OIHZprbcvQbdf5wmGSZvsq25SB4tXw74mVrL8';
 
+// Configuração do Mercado Pago
+if (!process.env.MP_ACCESS_TOKEN) {
+  console.error('ERRO: O Access Token do Mercado Pago não está configurado. Verifique o arquivo .env.');
+  process.exit(1);
+}
+mercadopago.configure({
+  access_token: process.env.MP_ACCESS_TOKEN
+});
+console.log('Access Token do Mercado Pago configurado com sucesso.');
+
 // Função para validar CPF (dígito verificador)
 function validarCPF(cpf) {
-  cpf = cpf.replace(/[^\d]+/g,'');
+  cpf = cpf.replace(/[^\d]+/g, '');
   if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
   let soma = 0, resto;
-  for (let i=1; i<=9; i++) soma += parseInt(cpf.substring(i-1, i))*(11-i);
-  resto = (soma*10)%11;
-  if ((resto===10)||(resto===11)) resto = 0;
+  for (let i = 1; i <= 9; i++) soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+  resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
   if (resto !== parseInt(cpf.substring(9, 10))) return false;
   soma = 0;
-  for (let i=1; i<=10; i++) soma += parseInt(cpf.substring(i-1, i))*(12-i);
-  resto = (soma*10)%11;
-  if ((resto===10)||(resto===11)) resto = 0;
+  for (let i = 1; i <= 10; i++) soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+  resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
   if (resto !== parseInt(cpf.substring(10, 11))) return false;
   return true;
 }
 
+// Conexão com a API do Google Sheets
 async function getSheetsClient() {
   const auth = new google.auth.GoogleAuth({
-    keyFile: '/etc/secrets/credentials.json',
+    keyFile: path.resolve(__dirname, 'credentials.json'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
   const authClient = await auth.getClient();
   return google.sheets({ version: 'v4', auth: authClient });
 }
 
+// Middleware para tratar requisições
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rota de cadastro (planilha Google)
+// Rota de cadastro (Google Sheets)
 app.post('/api/registrar', async (req, res) => {
   const { nome, cpf, email, cellphone } = req.body;
+
   if (!nome || !cpf || !email || !cellphone) {
     return res.status(400).json({ message: 'Nome, CPF, Email e Celular são obrigatórios.' });
   }
@@ -60,7 +73,7 @@ app.post('/api/registrar', async (req, res) => {
     const cpfExists = rows.some(row => row[1] === cpf);
 
     if (cpfExists) {
-      return res.status(400).json({ message: 'CPF já cadastrou e ganhou o brinde.' });
+      return res.status(400).json({ message: 'CPF já cadastrado e ganhou o brinde.' });
     }
 
     await sheets.spreadsheets.values.append({
@@ -72,84 +85,81 @@ app.post('/api/registrar', async (req, res) => {
 
     return res.status(200).json({ message: 'Cadastro realizado com sucesso! Brinde garantido.' });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Erro ao acessar a planilha.' });
+    console.error('[ERRO Google Sheets]', error);
+    return res.status(500).json({ message: 'Erro ao acessar a planilha.', detalhes: error.message });
   }
 });
 
-// =========== PAGAMENTO VIA PAGSEGURO CHECKOUT PRO (PIX) =============
+// Endpoint para gerar link de pagamento Mercado Pago (Checkout Pro)
+app.post('/api/gerar-pagamento', async (req, res) => {
+  console.log('[/api/gerar-pagamento] endpoint chamado', new Date().toISOString());
 
-// Endpoint para gerar link de pagamento PagSeguro (Checkout Pro, com opção Pix)
-app.post('/api/gerar-pix', async (req, res) => {
-  console.log('[/api/gerar-pix] endpoint chamado', new Date().toISOString());
-
-  const { frete } = req.body; // recebe do frontend: 'sedex' ou outro
+  const { frete } = req.body;
 
   let valor, descricao;
   if (frete === 'sedex') {
-    valor = "29.99";
-    descricao = "Frete SEDEX";
+    valor = 29.99;
+    descricao = 'Frete SEDEX';
+  } else if (frete === 'pac') {
+    valor = 17.99;
+    descricao = 'Frete PAC';
   } else {
-    valor = "17.99";
-    descricao = "Frete PAC";
+    return res.status(400).json({ erro: 'Tipo de frete inválido.' });
   }
 
-  // Dados obrigatórios do PagSeguro Checkout Pro
-  const PAGSEGURO_EMAIL = process.env.PAGSEGURO_EMAIL;
-  const PAGSEGURO_TOKEN = process.env.PAGSEGURO_TOKEN;
-
-  console.log('Preparando requisição PagSeguro:', { valor, descricao, PAGSEGURO_EMAIL, PAGSEGURO_TOKEN: PAGSEGURO_TOKEN ? 'ok' : 'faltando' });
-
-  if (!PAGSEGURO_EMAIL || !PAGSEGURO_TOKEN) {
-    return res.status(500).json({ erro: 'Credenciais PagSeguro Checkout Pro não configuradas corretamente.' });
-  }
+  console.log('[/api/gerar-pagamento] Dados de pagamento:', { descricao, valor });
 
   try {
-    const response = await axios.post(
-      'https://ws.pagseguro.uol.com.br/v2/checkout',
-      new URLSearchParams({
-        email: PAGSEGURO_EMAIL,
-        token: PAGSEGURO_TOKEN,
-        currency: 'BRL',
-        itemId1: '1',
-        itemDescription1: descricao,
-        itemAmount1: valor,
-        itemQuantity1: '1'
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      }
-    );
+    const preference = {
+      items: [
+        {
+          title: descricao,
+          unit_price: parseFloat(valor),
+          quantity: 1,
+        },
+      ],
+      payment_methods: {
+        excluded_payment_types: [
+          { id: 'ticket' }, // Exclui boleto bancário
+        ],
+        installments: 1, // Limita a 1 parcela
+      },
+      back_urls: {
+        success: `${process.env.BASE_URL}/sucesso`,
+        failure: `${process.env.BASE_URL}/falha`,
+        pending: `${process.env.BASE_URL}/pendente`,
+      },
+      auto_return: 'approved',
+    };
 
-    console.log('Resposta PagSeguro:', response.data);
+    const response = await mercadopago.preferences.create(preference);
+    console.log('Preferência criada com sucesso:', response.body);
 
-    // O retorno é em XML! Vamos extrair o código do checkout para montar a URL de pagamento
-    const match = response.data.match(/<code>([^<]+)<\/code>/);
-    if (!match) throw new Error('Código de pagamento não encontrado na resposta PagSeguro.');
-    const checkoutCode = match[1];
-    const redirectURL = `https://pagseguro.uol.com.br/v2/checkout/payment.html?code=${checkoutCode}`;
-
-    // Retorna a URL para o frontend redirecionar o usuário (onde ele pode escolher Pix)
-    res.json({ url_pagamento: redirectURL });
-
+    res.json({ url_pagamento: response.body.init_point });
   } catch (error) {
-    console.error('[ERRO PagSeguro Checkout Pro]');
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Headers:', error.response.headers);
-      console.error('Data:', error.response.data);
-    } else {
-      console.error(error);
-    }
+    console.error('[ERRO Mercado Pago Checkout Pro]', {
+      mensagem: error.message,
+      detalhes: error.response ? error.response.data : null,
+    });
     res.status(500).json({
-      erro: 'Erro ao criar cobrança PagSeguro Checkout Pro',
-      detalhes: error.response?.data || error.message || error
+      erro: 'Erro ao criar cobrança Mercado Pago',
+      detalhes: error.message || error,
     });
   }
 });
 
+// Rotas de retorno para o Mercado Pago direcionando para as páginas corretas
+app.get('/sucesso', (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'confirmacao.html'))
+);
+app.get('/falha', (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'erro.html'))
+);
+app.get('/pendente', (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'pendente.html'))
+);
+
+// Inicia o servidor
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
